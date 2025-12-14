@@ -13,7 +13,22 @@ type HomeProps = {
 export function Home({ onNavigate, currentUserId }: HomeProps) {
     const [allProducts, setAllProducts] = useState(mockProducts);
     const [products, setProducts] = useState(mockProducts);
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState('')
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        setLoading(true);
+        fetchProducts()
+            .then(data => {
+                setAllProducts(data);
+                setProducts(data);
+            })
+            .catch(() => {
+                setAllProducts(mockProducts);
+                setProducts(mockProducts);
+            })
+            .finally(() => setLoading(false));
+    }, []);
 
 
     useEffect(() => {
@@ -71,7 +86,14 @@ export function Home({ onNavigate, currentUserId }: HomeProps) {
         </div>
       </div>
 
-      {/* Product Grid */}
+        {loading && (
+            <div className="p-4 text-gray-500 text-center">
+                Loading products...
+            </div>
+        )}
+
+
+        {/* Product Grid */}
       <div className="px-4 pb-20">
         <div className="grid grid-cols-2 gap-3">
           {products.map((product) => (

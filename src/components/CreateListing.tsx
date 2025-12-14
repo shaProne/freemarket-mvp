@@ -1,7 +1,9 @@
-import { useState, useRef } from 'react';
 import { ArrowLeft, Upload } from 'lucide-react';
 import { Screen } from '../App';
-import { mockProducts, getNextProductId } from '../lib/mockData';
+import { createProduct } from '../lib/api';
+import { useState, useRef, ChangeEvent } from 'react';
+
+
 
 type CreateListingProps = {
   onNavigate: (screen: Screen) => void;
@@ -13,9 +15,10 @@ export function CreateListing({ onNavigate, currentUserId }: CreateListingProps)
   const [price, setPrice] = useState('');
   const [description, setDescription] = useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
@@ -26,25 +29,28 @@ export function CreateListing({ onNavigate, currentUserId }: CreateListingProps)
     }
   };
 
-  const handleSubmit = () => {
-    if (!name || !price || !description) {
-      alert('すべての項目を入力してください');
-      return;
-    }
+    const handleSubmit = async () => {
+        if (!name || !price || !description) {
+            setError('すべての項目を入力してください');
+            return;
+        }
 
-    const newProduct = {
-      id: getNextProductId(),
-      name,
-      price: parseInt(price),
-      description,
-      imageUrl: imagePreview || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
-      sellerId: currentUserId,
+        setError(null);
+
+        try {
+            await createProduct({
+                title: name,
+                price: Number(price),
+                description,
+                sellerId: currentUserId,
+            });
+
+            onNavigate({ type: 'home' });
+        } catch {
+            setError('出品に失敗しました');
+        }
     };
 
-    mockProducts.push(newProduct);
-    alert('商品を出品しました！');
-    onNavigate({ type: 'myPage' });
-  };
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-white">
@@ -127,6 +133,13 @@ export function CreateListing({ onNavigate, currentUserId }: CreateListingProps)
             />
           </div>
         </div>
+
+        {/* エラー表示 */}
+          {error && (
+              <div className="text-red-500 text-sm text-center">
+                  {error}
+              </div>
+          )}
 
         {/* Submit Button */}
         <button

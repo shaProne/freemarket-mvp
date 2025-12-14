@@ -7,6 +7,20 @@ import (
 	"time"
 )
 
+func withCORS(h http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		h(w, r)
+	}
+}
+
 type Product struct {
 	ID          string `json:"id"`
 	Title       string `json:"title"`
@@ -34,10 +48,29 @@ func main() {
 		w.Write([]byte("ok"))
 	})
 
-	mux.HandleFunc("/products", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/products", withCORS(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(products)
-	})
+
+		switch r.Method {
+		case http.MethodGet:
+			json.NewEncoder(w).Encode(products)
+
+		case http.MethodPost:
+			var p Product
+			if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+				http.Error(w, "invalid request body", http.StatusBadRequest)
+				return
+			}
+			p.ID = "p_" + time.Now().Format("150405")
+			p.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+			products = append(products, p)
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(p)
+
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
 
 	log.Println("Backend running at :8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))
