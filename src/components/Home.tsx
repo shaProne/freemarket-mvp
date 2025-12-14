@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Search, User } from 'lucide-react';
 import { Screen } from '../App';
 import { mockProducts } from '../lib/mockData';
+import { fetchProducts } from '../lib/api';
+
 
 type HomeProps = {
   onNavigate: (screen: Screen) => void;
@@ -9,23 +11,40 @@ type HomeProps = {
 };
 
 export function Home({ onNavigate, currentUserId }: HomeProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [products, setProducts] = useState(mockProducts);
+    const [allProducts, setAllProducts] = useState(mockProducts);
+    const [products, setProducts] = useState(mockProducts);
+    const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    if (searchQuery.trim() === '') {
-      setProducts(mockProducts);
-    } else {
-      const filtered = mockProducts.filter(
-        (p) =>
-          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          p.description.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setProducts(filtered);
-    }
-  }, [searchQuery]);
 
-  return (
+    useEffect(() => {
+        fetchProducts()
+            .then((data) => {
+                setAllProducts(data);
+                setProducts(data);
+            })
+            .catch(() => {
+                setAllProducts(mockProducts);
+                setProducts(mockProducts);
+            });
+    }, []);
+
+
+
+    useEffect(() => {
+        if (searchQuery.trim() === '') {
+            setProducts(allProducts);
+        } else {
+            const filtered = allProducts.filter(
+                (p) =>
+                    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    p.description.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+            setProducts(filtered);
+        }
+    }, [searchQuery, allProducts]);
+
+
+    return (
     <div className="max-w-md mx-auto">
       {/* Header */}
       <div className="h-14 px-4 flex items-center justify-between border-b border-gray-200">
