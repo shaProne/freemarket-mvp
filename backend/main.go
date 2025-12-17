@@ -6,8 +6,10 @@ import (
 	"net/http"
 	"time"
 
+	"freemarket-backend/auth"
 	"freemarket-backend/db"
 	"freemarket-backend/domain"
+	"freemarket-backend/middleware"
 	"freemarket-backend/repository"
 )
 
@@ -43,6 +45,33 @@ func main() {
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	})
+
+	// ===== Login API =====
+	mux.HandleFunc("/login", withCORS(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req struct {
+			UserID string `json:"userId"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.UserID == "" {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		token, err := auth.IssueToken(req.UserID)
+		if err != nil {
+			http.Error(w, "failed to issue token", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"token": token,
+		})
+	}))
 
 	// ===== Product API =====
 
@@ -84,32 +113,38 @@ func main() {
 	}))
 
 	// ===== 購入API =====
-	mux.HandleFunc("/purchase", withCORS(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
+	mux.HandleFunc("/purchase", withCORS(
+		middleware.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
 
-		var req struct {
-			ProductID string `json:"productId"`
-			BuyerID   string `json:"buyerId"`
-		}
+			// 1) body を読む
+			var req struct {
+				ProductID string `json:"productId"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ProductID == "" {
+				http.Error(w, "invalid request", http.StatusBadRequest)
+				return
+			}
 
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "invalid request", http.StatusBadRequest)
-			return
-		}
+			// 2) token から userId を取る（buyerId は body から取らない）
+			buyerID, ok := middleware.UserIDFromContext(r.Context())
+			if !ok {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
 
-		if err := store.Purchase(req.ProductID, req.BuyerID); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
+			// 3) 購入処理（1回だけ）
+			if err := store.Purchase(req.ProductID, buyerID); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{
-			"status": "sold",
-		})
-	}))
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]string{"status": "sold"})
+		})))
 
 	log.Println("Backend running at :8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))
