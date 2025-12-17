@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, Plus } from "lucide-react";
 import { Screen } from "../App";
-import { fetchProducts } from "../lib/api";
+import { fetchProducts, fetchMe } from "../lib/api";
 
 type MyPageProps = {
     onNavigate: (screen: Screen) => void;
@@ -18,9 +18,20 @@ type Product = {
     imageUrl?: string;
 };
 
+type Me = {
+    userId: string;
+    displayName: string;
+    mbti: string;
+};
+
 export function MyPage({ onNavigate, currentUserId }: MyPageProps) {
     const [myProducts, setMyProducts] = useState<Product[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loadingProducts, setLoadingProducts] = useState(true);
+
+    const [me, setMe] = useState<Me | null>(null);
+    const [loadingMe, setLoadingMe] = useState(true);
+
+    const token = localStorage.getItem("token");
 
     const handleLogout = () => {
         localStorage.removeItem("token");
@@ -28,8 +39,28 @@ export function MyPage({ onNavigate, currentUserId }: MyPageProps) {
         onNavigate({ type: "login" });
     };
 
+    // ① 自分のプロフィール（表示名/MBTI）を取得
     useEffect(() => {
-        setLoading(true);
+        setLoadingMe(true);
+
+        if (!token) {
+            setMe(null);
+            setLoadingMe(false);
+            return;
+        }
+
+        fetchMe(token)
+            .then((u) => setMe(u))
+            .catch((err) => {
+                console.error(err);
+                setMe(null);
+            })
+            .finally(() => setLoadingMe(false));
+    }, [token]);
+
+    // ② 自分の出品一覧を取得
+    useEffect(() => {
+        setLoadingProducts(true);
         fetchProducts()
             .then((data: Product[]) => {
                 const mine = data.filter((p) => p.sellerId === currentUserId);
@@ -39,7 +70,7 @@ export function MyPage({ onNavigate, currentUserId }: MyPageProps) {
                 console.error(err);
                 setMyProducts([]);
             })
-            .finally(() => setLoading(false));
+            .finally(() => setLoadingProducts(false));
     }, [currentUserId]);
 
     return (
@@ -58,7 +89,7 @@ export function MyPage({ onNavigate, currentUserId }: MyPageProps) {
 
                 <button
                     onClick={handleLogout}
-                    className="text-sm px-8 py-2 border-2 border-red-500 text-red-500 rounded-lg hover:bg-red-50 transition-colors"
+                    className="text-sm px-4 py-2 border-2 border-red-500 text-red-500 rounded-lg hover:bg-red-50 transition-colors"
                 >
                     ログアウト
                 </button>
@@ -66,8 +97,24 @@ export function MyPage({ onNavigate, currentUserId }: MyPageProps) {
 
             {/* User Info */}
             <div className="p-6 border-b border-gray-200">
-                <div className="text-gray-600">ユーザーID</div>
-                <div className="mt-1">{currentUserId}</div>
+                <div className="text-gray-600 text-sm">ログインID</div>
+                <div className="mt-1 font-mono">{currentUserId}</div>
+
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="p-3 rounded-lg bg-gray-50 border">
+                        <div className="text-gray-500 text-xs">表示名</div>
+                        <div className="mt-1">
+                            {loadingMe ? "Loading..." : me?.displayName || "未設定"}
+                        </div>
+                    </div>
+
+                    <div className="p-3 rounded-lg bg-gray-50 border">
+                        <div className="text-gray-500 text-xs">MBTI</div>
+                        <div className="mt-1">
+                            {loadingMe ? "Loading..." : me?.mbti || "未設定"}
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* User's Listings */}
@@ -83,7 +130,7 @@ export function MyPage({ onNavigate, currentUserId }: MyPageProps) {
                     </button>
                 </div>
 
-                {loading ? (
+                {loadingProducts ? (
                     <div className="py-12 text-center text-gray-500">Loading...</div>
                 ) : myProducts.length === 0 ? (
                     <div className="py-12 text-center text-gray-500">

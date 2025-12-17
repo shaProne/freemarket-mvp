@@ -48,7 +48,8 @@ func main() {
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	})
-	// signup
+
+	// ===== Signup API =====
 	mux.HandleFunc("/signup", withCORS(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -56,8 +57,10 @@ func main() {
 		}
 
 		var req struct {
-			UserID   string `json:"userId"`
-			Password string `json:"password"`
+			UserID      string `json:"userId"`
+			Password    string `json:"password"`
+			DisplayName string `json:"displayName"`
+			MBTI        string `json:"mbti"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -75,9 +78,11 @@ func main() {
 			return
 		}
 
-		err = userRepo.Create(repository.User{
+		err = userRepo.Create(domain.User{
 			ID:           req.UserID,
 			PasswordHash: string(hash),
+			DisplayName:  req.DisplayName,
+			MBTI:         req.MBTI,
 			CreatedAt:    time.Now().Format(time.RFC3339),
 		})
 		if err != nil {
@@ -121,29 +126,56 @@ func main() {
 			return
 		}
 
-		// ここは君のJWT実装に合わせる：
 		token, err := auth.IssueToken(req.UserID)
 		if err != nil {
 			http.Error(w, "failed to generate token", http.StatusInternalServerError)
 			return
 		}
 
+		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
 			"token": token,
 		})
 	}))
 
-	// ===== Product API =====
+	// ===== Me API (IMPORTANT: login の外に置く) =====
+	mux.HandleFunc("/me", withCORS(
+		middleware.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodGet {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
 
+			userID, ok := middleware.UserIDFromContext(r.Context())
+			if !ok {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+
+			u, err := userRepo.FindByID(userID)
+			if err != nil {
+				http.Error(w, "user not found", http.StatusNotFound)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]string{
+				"userId":      u.ID,
+				"displayName": u.DisplayName,
+				"mbti":        u.MBTI,
+			})
+		}),
+	))
+
+	// ===== Product API =====
 	mux.HandleFunc("/products", withCORS(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		switch r.Method {
-
 		case http.MethodGet:
 			products, err := store.List()
 			if err != nil {
-				log.Println("store.List error:", err) // ←追加
+				log.Println("store.List error:", err)
 				http.Error(w, "failed to list products", http.StatusInternalServerError)
 				return
 			}
@@ -173,7 +205,7 @@ func main() {
 		}
 	}))
 
-	// GEMINI API
+	// ===== GEMINI API =====
 	mux.HandleFunc("/ai/product-summary", withCORS(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -188,28 +220,26 @@ func main() {
 			return
 		}
 
-		// 1) DBから商品取得
 		p, err := store.FindByID(req.ProductID)
 		if err != nil {
 			http.Error(w, "product not found", http.StatusNotFound)
 			return
 		}
 
-		// 2) Geminiへ投げる（あなたの auth/gemini 実装に合わせる）
-		// 例：auth.GenerateProductSummary(p) みたいな関数を用意する
 		text, err := auth.GenerateProductSummary(p)
 		if err != nil {
-			log.Println("GenerateProductSummary error:", err)          // ←追加
-			http.Error(w, err.Error(), http.StatusInternalServerError) // ←中身返す
+			log.Println("GenerateProductSummary error:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
 			"text": text,
 		})
 	}))
 
-	// ===== 購入API =====
+	// ===== Purchase API =====
 	mux.HandleFunc("/purchase", withCORS(
 		middleware.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodPost {
@@ -217,7 +247,6 @@ func main() {
 				return
 			}
 
-			// 1) body を読む
 			var req struct {
 				ProductID string `json:"productId"`
 			}
@@ -226,14 +255,12 @@ func main() {
 				return
 			}
 
-			// 2) token から userId を取る（buyerId は body から取らない）
 			buyerID, ok := middleware.UserIDFromContext(r.Context())
 			if !ok {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
 
-			// 3) 購入処理（1回だけ）
 			if err := store.Purchase(req.ProductID, buyerID); err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
@@ -241,7 +268,8 @@ func main() {
 
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]string{"status": "sold"})
-		})))
+		}),
+	))
 
 	log.Println("Backend running at :8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))

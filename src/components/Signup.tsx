@@ -11,14 +11,16 @@ const MBTI_LIST = [
 
 export function Signup({ onNavigate }: { onNavigate: (screen: Screen) => void }) {
     const [userId, setUserId] = useState("");
+    const [displayName, setDisplayName] = useState("");
     const [password, setPassword] = useState("");
     const [mbti, setMbti] = useState("INTP");
+
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
     const handleSignup = async () => {
-        if (!userId || !password || !mbti) {
-            setError("userId / password / MBTI を入力してください");
+        if (!userId || !displayName || !password || !mbti) {
+            setError("すべての項目を入力してください");
             return;
         }
 
@@ -26,12 +28,15 @@ export function Signup({ onNavigate }: { onNavigate: (screen: Screen) => void })
         setError(null);
 
         try {
-            await signup(userId, password, mbti);
+            // ✅ displayName / mbti を明示的に送る
+            await signup(userId, password, displayName, mbti);
 
-            // ついでに自動ログイン（UX良い）
+            // UX向上：登録後そのままログイン
             const { token } = await login(userId, password);
+
             localStorage.setItem("token", token);
             localStorage.setItem("userId", userId);
+            localStorage.setItem("displayName", displayName);
             localStorage.setItem("mbti", mbti);
 
             onNavigate({ type: "home" });
@@ -46,7 +51,8 @@ export function Signup({ onNavigate }: { onNavigate: (screen: Screen) => void })
         <div className="max-w-md mx-auto min-h-screen bg-white p-6">
             <h1 className="text-xl mb-6">新規登録</h1>
 
-            <label className="block mb-2 text-gray-700">User ID</label>
+            {/* User ID（ログイン用） */}
+            <label className="block mb-2 text-gray-700">User ID（ログイン用）</label>
             <input
                 className="w-full h-12 px-4 border border-gray-300 rounded-lg outline-none focus:border-blue-600"
                 value={userId}
@@ -54,6 +60,16 @@ export function Signup({ onNavigate }: { onNavigate: (screen: Screen) => void })
                 placeholder="u_001"
             />
 
+            {/* 表示名 */}
+            <label className="block mt-4 mb-2 text-gray-700">表示名</label>
+            <input
+                className="w-full h-12 px-4 border border-gray-300 rounded-lg outline-none focus:border-blue-600"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="one"
+            />
+
+            {/* Password */}
             <label className="block mt-4 mb-2 text-gray-700">Password</label>
             <input
                 type="password"
@@ -63,6 +79,7 @@ export function Signup({ onNavigate }: { onNavigate: (screen: Screen) => void })
                 placeholder="pass1234"
             />
 
+            {/* MBTI */}
             <label className="block mt-4 mb-2 text-gray-700">MBTI</label>
             <select
                 className="w-full h-12 px-4 border border-gray-300 rounded-lg outline-none focus:border-blue-600 bg-white"

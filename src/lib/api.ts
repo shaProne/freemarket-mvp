@@ -47,7 +47,7 @@ export async function purchaseProduct(productId: string, token: string) {
     return res.json();
 }
 
-export async function signup(userId: string, password: string, mbti: string) {
+export async function signup(userId: string, password: string, displayName: string, mbti: string) {
     const res = await fetch("http://localhost:8080/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -89,4 +89,26 @@ export async function login(userId: string, password: string) {
         throw new Error(text || "login failed");
     }
     return res.json(); // { token: "..." }
+}
+
+export type UserProfile = {
+    userId: string;
+    displayName: string;
+    mbti: string;
+};
+
+// 自分のプロフィールを取る（JWTから判定）
+export async function fetchMe(token: string) {
+    const res = await fetch(`${API_BASE}/me`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "failed to fetch me");
+    }
+
+    return (await res.json()) as UserProfile;
 }
