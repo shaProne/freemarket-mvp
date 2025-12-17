@@ -11,6 +11,7 @@ import (
 	"freemarket-backend/domain"
 	"freemarket-backend/middleware"
 	"freemarket-backend/repository"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // ===== CORS =====
@@ -38,6 +39,7 @@ func main() {
 	}
 
 	store := repository.NewSQLiteProductRepository(database)
+	userRepo := repository.NewUserRepository(database)
 
 	mux := http.NewServeMux()
 
@@ -45,6 +47,46 @@ func main() {
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	})
+	// signup
+	mux.HandleFunc("/signup", withCORS(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req struct {
+			UserID   string `json:"userId"`
+			Password string `json:"password"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request", http.StatusBadRequest)
+			return
+		}
+		if req.UserID == "" || req.Password == "" {
+			http.Error(w, "userId and password are required", http.StatusBadRequest)
+			return
+		}
+
+		hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+		if err != nil {
+			http.Error(w, "failed to hash password", http.StatusInternalServerError)
+			return
+		}
+
+		err = userRepo.Create(repository.User{
+			ID:           req.UserID,
+			PasswordHash: string(hash),
+			CreatedAt:    time.Now().Format(time.RFC3339),
+		})
+		if err != nil {
+			http.Error(w, "user already exists (or db error)", http.StatusBadRequest)
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}))
 
 	// ===== Login API =====
 	mux.HandleFunc("/login", withCORS(func(w http.ResponseWriter, r *http.Request) {
@@ -54,20 +96,37 @@ func main() {
 		}
 
 		var req struct {
-			UserID string `json:"userId"`
+			UserID   string `json:"userId"`
+			Password string `json:"password"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.UserID == "" {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request", http.StatusBadRequest)
+			return
+		}
+		if req.UserID == "" || req.Password == "" {
+			http.Error(w, "userId and password are required", http.StatusBadRequest)
 			return
 		}
 
+		u, err := userRepo.FindByID(req.UserID)
+		if err != nil {
+			http.Error(w, "invalid credentials", http.StatusUnauthorized)
+			return
+		}
+
+		if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(req.Password)); err != nil {
+			http.Error(w, "invalid credentials", http.StatusUnauthorized)
+			return
+		}
+
+		// ここは君のJWT実装に合わせる：
 		token, err := auth.IssueToken(req.UserID)
 		if err != nil {
-			http.Error(w, "failed to issue token", http.StatusInternalServerError)
+			http.Error(w, "failed to generate token", http.StatusInternalServerError)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
 			"token": token,
 		})
