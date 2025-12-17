@@ -5,6 +5,10 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"freemarket-backend/db"
+	"freemarket-backend/domain"
+	"freemarket-backend/repository"
 )
 
 // ===== CORS =====
@@ -26,7 +30,12 @@ func withCORS(h http.HandlerFunc) http.HandlerFunc {
 // ===== App =====
 
 func main() {
-	store := NewInMemoryStore()
+	database, err := db.NewDB()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	store := repository.NewSQLiteProductRepository(database)
 
 	mux := http.NewServeMux()
 
@@ -51,7 +60,7 @@ func main() {
 			json.NewEncoder(w).Encode(products)
 
 		case http.MethodPost:
-			var p Product
+			var p domain.Product
 			if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
 				http.Error(w, "invalid request body", http.StatusBadRequest)
 				return
@@ -59,9 +68,9 @@ func main() {
 
 			p.ID = "p_" + time.Now().Format("150405")
 			p.Status = "available"
-			p.CreatedAt = time.Now()
+			p.CreatedAt = time.Now().Format(time.RFC3339)
 
-			if err := store.CreateProduct(p); err != nil {
+			if err := store.Create(p); err != nil {
 				http.Error(w, "failed to create product", http.StatusInternalServerError)
 				return
 			}
