@@ -1,10 +1,27 @@
 const API_BASE = "http://localhost:8080";
 
-export async function fetchProducts() {
-    const res = await fetch(`${API_BASE}/products`);
+export type Product = {
+    id: string;
+    title: string;
+    price: number;
+    description: string;
+    sellerId: string;
+    status?: string;
+    imageUrl?: string;
+
+    likeCount?: number;
+    likedByMe?: boolean;
+};
+
+
+export async function fetchProducts(token?: string): Promise<Product[]> {
+    const res = await fetch(`${API_BASE}/products`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
     if (!res.ok) throw new Error("failed to fetch");
     return res.json();
 }
+
 
 export async function createProduct(product: {
     title: string;
@@ -111,4 +128,25 @@ export async function fetchMe(token: string) {
     }
 
     return (await res.json()) as UserProfile;
+}
+
+export async function toggleLike(productId: string, token: string) {
+    const res = await fetch(`${API_BASE}/likes/toggle`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ productId }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json() as Promise<{ liked: boolean; likeCount: number }>;
+}
+
+export async function fetchProductsAuthed(token?: string) {
+    const res = await fetch(`${API_BASE}/products`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error("failed to fetch");
+    return res.json();
 }

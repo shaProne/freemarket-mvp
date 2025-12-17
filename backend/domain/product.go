@@ -9,4 +9,6 @@ type Product struct {
 	Status      string `json:"status"`
 	CreatedAt   string `json:"createdAt"`
 	ImageURL    string `json:"imageUrl"`
+	LikeCount   int    `json:"likeCount"`
+	LikedByMe   bool   `json:"likedByMe"`
 }

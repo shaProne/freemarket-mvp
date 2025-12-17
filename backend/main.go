@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"freemarket-backend/auth"
@@ -31,6 +32,25 @@ func withCORS(h http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// ===== 任意トークンから userId を取り出す（/products GET 用）=====
+// 認証必須ではなく「付いてたら読む」だけ
+func tryGetUserID(r *http.Request) (string, bool) {
+	h := r.Header.Get("Authorization")
+	if h == "" {
+		return "", false
+	}
+	const prefix = "Bearer "
+	if !strings.HasPrefix(h, prefix) {
+		return "", false
+	}
+
+	claims, err := auth.VerifyToken(strings.TrimPrefix(h, prefix))
+	if err != nil {
+		return "", false
+	}
+	return claims.UserID, true
+}
+
 // ===== App =====
 
 func main() {
@@ -41,6 +61,7 @@ func main() {
 
 	store := repository.NewSQLiteProductRepository(database)
 	userRepo := repository.NewUserRepository(database)
+	likeRepo := repository.NewSQLiteLikeRepository(database)
 
 	mux := http.NewServeMux()
 
@@ -138,7 +159,7 @@ func main() {
 		})
 	}))
 
-	// ===== Me API (IMPORTANT: login の外に置く) =====
+	// ===== Me API =====
 	mux.HandleFunc("/me", withCORS(
 		middleware.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodGet {
@@ -167,11 +188,99 @@ func main() {
 		}),
 	))
 
+	// ===== Likes API =====
+	// POST /likes  { productId: "p_xxx" }
+	// Authorization: Bearer <token>
+	// → 既にいいね済みなら Unlike、未いいねなら Like（= toggle）
+	mux.HandleFunc("/likes", withCORS(
+		middleware.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+
+			var req struct {
+				ProductID string `json:"productId"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ProductID == "" {
+				http.Error(w, "invalid request", http.StatusBadRequest)
+				return
+			}
+
+			userID, ok := middleware.UserIDFromContext(r.Context())
+			if !ok {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+
+			// toggle
+			liked, err := likeRepo.IsLiked(req.ProductID, userID)
+			if err != nil {
+				log.Println("likeRepo.IsLiked error:", err)
+				http.Error(w, "failed to check like", http.StatusInternalServerError)
+				return
+			}
+
+			if liked {
+				if err := likeRepo.Unlike(req.ProductID, userID); err != nil {
+					log.Println("likeRepo.Unlike error:", err)
+					http.Error(w, "failed to unlike", http.StatusInternalServerError)
+					return
+				}
+			} else {
+				if err := likeRepo.Like(req.ProductID, userID); err != nil {
+					log.Println("likeRepo.Like error:", err)
+					http.Error(w, "failed to like", http.StatusInternalServerError)
+					return
+				}
+			}
+
+			// 最新のいいね数を返す
+			cnt, err := likeRepo.CountByProduct(req.ProductID)
+			if err != nil {
+				log.Println("likeRepo.CountByProduct error:", err)
+				http.Error(w, "failed to count likes", http.StatusInternalServerError)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{
+				"liked": !liked, // toggle後の状態
+				"count": cnt,
+			})
+		}),
+	))
+
+	// GET /likes/count?productId=p_xxx  → { count: 3 }
+	mux.HandleFunc("/likes/count", withCORS(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		productID := r.URL.Query().Get("productId")
+		if productID == "" {
+			http.Error(w, "productId is required", http.StatusBadRequest)
+			return
+		}
+
+		cnt, err := likeRepo.CountByProduct(productID)
+		if err != nil {
+			log.Println("likeRepo.CountByProduct error:", err)
+			http.Error(w, "failed to count likes", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"count": cnt})
+	}))
+
 	// ===== Product API =====
 	mux.HandleFunc("/products", withCORS(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		switch r.Method {
+
 		case http.MethodGet:
 			products, err := store.List()
 			if err != nil {
@@ -179,6 +288,26 @@ func main() {
 				http.Error(w, "failed to list products", http.StatusInternalServerError)
 				return
 			}
+
+			uid, ok := tryGetUserID(r)
+
+			// いいね数 + 自分がいいねしたか（tokenがあれば）
+			for i := range products {
+				c, err := likeRepo.CountByProduct(products[i].ID)
+				if err != nil {
+					log.Println("likeRepo.CountByProduct error:", err)
+					c = 0
+				}
+				products[i].LikeCount = c
+
+				if ok {
+					liked, err := likeRepo.IsLiked(products[i].ID, uid)
+					if err == nil {
+						products[i].LikedByMe = liked
+					}
+				}
+			}
+
 			json.NewEncoder(w).Encode(products)
 
 		case http.MethodPost:
@@ -204,6 +333,50 @@ func main() {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	}))
+
+	// ===== Like Toggle API =====
+	mux.HandleFunc("/likes/toggle", withCORS(
+		middleware.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+
+			var req struct {
+				ProductID string `json:"productId"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ProductID == "" {
+				http.Error(w, "invalid request", http.StatusBadRequest)
+				return
+			}
+
+			userID, ok := middleware.UserIDFromContext(r.Context())
+			if !ok {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+
+			liked, err := likeRepo.IsLiked(req.ProductID, userID)
+			if err != nil {
+				http.Error(w, "db error", http.StatusInternalServerError)
+				return
+			}
+
+			if liked {
+				_ = likeRepo.Unlike(req.ProductID, userID)
+			} else {
+				_ = likeRepo.Like(req.ProductID, userID)
+			}
+
+			count, _ := likeRepo.CountByProduct(req.ProductID)
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{
+				"liked":     !liked,
+				"likeCount": count,
+			})
+		}),
+	))
 
 	// ===== GEMINI API =====
 	mux.HandleFunc("/ai/product-summary", withCORS(func(w http.ResponseWriter, r *http.Request) {

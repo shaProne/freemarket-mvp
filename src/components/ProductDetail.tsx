@@ -5,6 +5,7 @@ import {
     fetchProducts,
     purchaseProduct,
     generateProductSummary,
+    toggleLike,
 } from "../lib/api";
 
 type ProductDetailProps = {
@@ -21,6 +22,9 @@ type Product = {
     sellerId: string;
     status?: string;
     imageUrl?: string;
+
+    likeCount?: number;
+    likedByMe?: boolean;
 };
 
 export function ProductDetail({
@@ -39,14 +43,14 @@ export function ProductDetail({
     const [aiLoading, setAiLoading] = useState(false);
     const [aiError, setAiError] = useState<string | null>(null);
 
-    const token = useMemo(() => localStorage.getItem("token"), []);
+    const token = useMemo(() => localStorage.getItem("token") ?? "", []);
 
     // 1) 商品を取得
     useEffect(() => {
         setLoading(true);
         setError(null);
 
-        fetchProducts()
+        fetchProducts(token || undefined)
             .then((data: Product[]) => {
                 const found = data.find((p) => p.id === productId) ?? null;
                 setProduct(found);
@@ -57,7 +61,7 @@ export function ProductDetail({
                 setProduct(null);
             })
             .finally(() => setLoading(false));
-    }, [productId]);
+    }, [productId, token]);
 
     // 2) 商品が取れたら Gemini で要約生成（B案：詳細を見たとき自動）
     useEffect(() => {
@@ -96,6 +100,36 @@ export function ProductDetail({
             alert(`購入に失敗しました: ${e?.message ?? "unknown error"}`);
         } finally {
             setBuying(false);
+        }
+    };
+
+    const handleToggleLike = async () => {
+        if (!token) {
+            alert("いいねするにはログインしてください");
+            return;
+        }
+        if (!product) return;
+
+        // 楽観的UI更新
+        const nextLiked = !(product.likedByMe ?? false);
+        const nextCount = (product.likeCount ?? 0) + (nextLiked ? 1 : -1);
+        setProduct({ ...product, likedByMe: nextLiked, likeCount: Math.max(0, nextCount) });
+
+        try {
+            const res = await toggleLike(product.id, token);
+            setProduct({ ...product, likedByMe: res.liked, likeCount: res.likeCount });
+        } catch (e: any) {
+            console.error(e);
+            alert(e?.message ?? "いいねに失敗しました");
+
+            // 失敗したら取り直す（確実に戻す）
+            try {
+                const data: Product[] = await fetchProducts(token || undefined);
+                const found = data.find((p) => p.id === productId) ?? null;
+                setProduct(found);
+            } catch (err) {
+                console.error(err);
+            }
         }
     };
 
@@ -141,6 +175,9 @@ export function ProductDetail({
         );
     }
 
+    const likeCount = product.likeCount ?? 0;
+    const liked = product.likedByMe ?? false;
+
     return (
         <div className="max-w-md mx-auto min-h-screen bg-white">
             {/* Header */}
@@ -151,8 +188,18 @@ export function ProductDetail({
                 >
                     <ArrowLeft className="w-6 h-6" />
                 </button>
-                <button className="p-2 hover:bg-gray-100 rounded-full">
-                    <Heart className="w-6 h-6" />
+
+                {/* 右上：ハート + いいね数 */}
+                <button
+                    onClick={handleToggleLike}
+                    className="flex items-center gap-1 px-2 py-1 rounded-full hover:bg-gray-100"
+                >
+                    <Heart
+                        className={`w-6 h-6 ${
+                            liked ? "fill-red-500 text-red-500" : "text-gray-500"
+                        }`}
+                    />
+                    <span className="text-sm text-gray-700">{likeCount}</span>
                 </button>
             </div>
 
