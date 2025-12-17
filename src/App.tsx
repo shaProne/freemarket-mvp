@@ -40,7 +40,7 @@ export default function App() {
     const initialUserId = localStorage.getItem("userId") ?? "";
 
     const [currentScreen, setCurrentScreen] = useState<Screen>(
-        hasToken ? { type: "home" } : { type: "login" }
+        hasToken ? {type: "home"} : {type: "login"}
     );
 
     const [currentUserId, setCurrentUserId] = useState<string>(initialUserId);
@@ -48,56 +48,79 @@ export default function App() {
     // token が消されたらログイン画面へ戻す
     useEffect(() => {
         if (!localStorage.getItem("token")) {
-            setCurrentScreen({ type: "login" });
+            setCurrentScreen({type: "login"});
         }
     }, []);
 
     return (
-        <div className="min-h-screen bg-white">
-            {currentScreen.type === "login" && (
-                <Login
-                    onNavigate={(screen) => {
-                        // Login.tsx から home に戻す想定だが、
-                        // 念のため userId をここでも同期
-                        const uid = localStorage.getItem("userId") ?? "";
-                        setCurrentUserId(uid);
-                        setCurrentScreen(screen);
-                    }}
-                />
-            )}
+        <div className="min-h-screen relative">
+            {/* 背景画像 */}
+            <div
+                style={{
+                    position: "fixed",
+                    inset: 0,
+                    zIndex: 0,
+                    backgroundImage: "url(/bgg.jpg)",
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                    filter: "blur(0px)",
+                    transform: "scale(1.05)", // ぼかしの端の白抜け防止
+                }}
+            />
 
-            {currentScreen.type === "signup" && (
-                <Signup onNavigate={setCurrentScreen} />
-            )}
+            <div
+                style={{
+                    position: "fixed",
+                    inset: 0,
+                    zIndex: 1,
+                    backgroundColor: "rgba(255,255,255,0.1)", // 読みやすさ用の薄い膜
+                    pointerEvents: "none",
+                }}
+            />
 
-            {currentScreen.type === "home" && (
-                <Home onNavigate={setCurrentScreen} currentUserId={currentUserId} />
-            )}
+            {/* アプリ本体 */}
+            <div className="relative z-10 max-w-md mx-auto min-h-screen">
+                {currentScreen.type === "login" && (
+                    <Login
+                        onNavigate={(screen) => {
+                            const uid = localStorage.getItem("userId") ?? "";
+                            setCurrentUserId(uid);
+                            setCurrentScreen(screen);
+                        }}
+                    />
+                )}
 
-            {currentScreen.type === "productDetail" && (
-                <ProductDetail
-                    productId={currentScreen.productId}
-                    onNavigate={setCurrentScreen}
-                    currentUserId={currentUserId}
-                />
-            )}
+                {currentScreen.type === "signup" && <Signup onNavigate={setCurrentScreen}/>}
 
-            {currentScreen.type === "createListing" && (
-                <CreateListing onNavigate={setCurrentScreen} currentUserId={currentUserId} />
-            )}
+                {currentScreen.type === "home" && (
+                    <Home onNavigate={setCurrentScreen} currentUserId={currentUserId}/>
+                )}
 
-            {currentScreen.type === "chat" && (
-                <Chat
-                    otherUserId={currentScreen.otherUserId}
-                    otherUserName={currentScreen.otherUserName}
-                    currentUserId={currentUserId}
-                    onNavigate={setCurrentScreen}
-                />
-            )}
+                {currentScreen.type === "productDetail" && (
+                    <ProductDetail
+                        productId={currentScreen.productId}
+                        onNavigate={setCurrentScreen}
+                        currentUserId={currentUserId}
+                    />
+                )}
 
-            {currentScreen.type === "myPage" && (
-                <MyPage onNavigate={setCurrentScreen} currentUserId={currentUserId} />
-            )}
+                {currentScreen.type === "createListing" && (
+                    <CreateListing onNavigate={setCurrentScreen} currentUserId={currentUserId}/>
+                )}
+
+                {currentScreen.type === "chat" && (
+                    <Chat
+                        otherUserId={currentScreen.otherUserId}
+                        otherUserName={currentScreen.otherUserName}
+                        currentUserId={currentUserId}
+                        onNavigate={setCurrentScreen}
+                    />
+                )}
+
+                {currentScreen.type === "myPage" && (
+                    <MyPage onNavigate={setCurrentScreen} currentUserId={currentUserId}/>
+                )}
+            </div>
         </div>
     );
 }
