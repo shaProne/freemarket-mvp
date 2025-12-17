@@ -5,6 +5,7 @@ import { CreateListing } from "./components/CreateListing";
 import { Chat } from "./components/Chat";
 import { MyPage } from "./components/MyPage";
 import { Login } from "./components/Login";
+import { Signup } from "./components/Signup";
 
 export type Product = {
     id: string;
@@ -27,6 +28,7 @@ export type Message = {
 
 export type Screen =
     | { type: "login" }
+    | { type: "signup" }
     | { type: "home" }
     | { type: "productDetail"; productId: string }
     | { type: "createListing" }
@@ -62,6 +64,10 @@ export default function App() {
                         setCurrentScreen(screen);
                     }}
                 />
+            )}
+
+            {currentScreen.type === "signup" && (
+                <Signup onNavigate={setCurrentScreen} />
             )}
 
             {currentScreen.type === "home" && (

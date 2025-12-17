@@ -11,6 +11,7 @@ import (
 	"freemarket-backend/domain"
 	"freemarket-backend/middleware"
 	"freemarket-backend/repository"
+
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -142,6 +143,7 @@ func main() {
 		case http.MethodGet:
 			products, err := store.List()
 			if err != nil {
+				log.Println("store.List error:", err) // ←追加
 				http.Error(w, "failed to list products", http.StatusInternalServerError)
 				return
 			}
@@ -169,6 +171,42 @@ func main() {
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
+	}))
+
+	// GEMINI API
+	mux.HandleFunc("/ai/product-summary", withCORS(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req struct {
+			ProductID string `json:"productId"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ProductID == "" {
+			http.Error(w, "invalid request", http.StatusBadRequest)
+			return
+		}
+
+		// 1) DBから商品取得
+		p, err := store.FindByID(req.ProductID)
+		if err != nil {
+			http.Error(w, "product not found", http.StatusNotFound)
+			return
+		}
+
+		// 2) Geminiへ投げる（あなたの auth/gemini 実装に合わせる）
+		// 例：auth.GenerateProductSummary(p) みたいな関数を用意する
+		text, err := auth.GenerateProductSummary(p)
+		if err != nil {
+			log.Println("GenerateProductSummary error:", err)          // ←追加
+			http.Error(w, err.Error(), http.StatusInternalServerError) // ←中身返す
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"text": text,
+		})
 	}))
 
 	// ===== 購入API =====

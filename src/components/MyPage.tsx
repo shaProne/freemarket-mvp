@@ -58,7 +58,7 @@ export function MyPage({ onNavigate, currentUserId }: MyPageProps) {
 
                 <button
                     onClick={handleLogout}
-                    ClassName="text-sm px-8 py-2 border-2 border-red-500 text-red-500 rounded-lg hover:bg-red-50 transition-colors"
+                    className="text-sm px-8 py-2 border-2 border-red-500 text-red-500 rounded-lg hover:bg-red-50 transition-colors"
                 >
                     ログアウト
                 </button>

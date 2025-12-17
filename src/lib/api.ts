@@ -23,7 +23,7 @@ export async function createProduct(product: {
 
     if (!res.ok) {
         const text = await res.text();
-        throw new Error(text || "failed to create product");
+        throw new Error(text || `failed to create product (${res.status})`);
     }
 
     return res.json();
@@ -47,14 +47,40 @@ export async function purchaseProduct(productId: string, token: string) {
     return res.json();
 }
 
+export async function signup(userId: string, password: string, mbti: string) {
+    const res = await fetch("http://localhost:8080/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, password, mbti }),
+    });
 
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "signup failed");
+    }
+    return res.json(); // { status: "ok" } みたいなの
+}
+
+// GEMINI
+export async function generateProductSummary(productId: string) {
+    const res = await fetch(`${API_BASE}/ai/product-summary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId }),
+    });
+
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "failed to generate summary");
+    }
+
+    return res.json() as Promise<{ text: string }>;
+}
 
 export async function login(userId: string, password: string) {
     const res = await fetch("http://localhost:8080/login", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, password }),
     });
 
@@ -62,6 +88,5 @@ export async function login(userId: string, password: string) {
         const text = await res.text();
         throw new Error(text || "login failed");
     }
-
-    return res.json(); // { token }
+    return res.json(); // { token: "..." }
 }

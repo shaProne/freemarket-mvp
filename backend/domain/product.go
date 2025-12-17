@@ -8,4 +8,5 @@ type Product struct {
 	SellerID    string `json:"sellerId"`
 	Status      string `json:"status"`
 	CreatedAt   string `json:"createdAt"`
+	ImageURL    string `json:"imageUrl"`
 }

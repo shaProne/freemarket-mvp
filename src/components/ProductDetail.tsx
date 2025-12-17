@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Heart } from "lucide-react";
 import { Screen } from "../App";
-import { fetchProducts, purchaseProduct } from "../lib/api";
+import {
+    fetchProducts,
+    purchaseProduct,
+    generateProductSummary,
+} from "../lib/api";
 
 type ProductDetailProps = {
     productId: string;
@@ -19,14 +23,25 @@ type Product = {
     imageUrl?: string;
 };
 
-export function ProductDetail({ productId, onNavigate, currentUserId }: ProductDetailProps) {
+export function ProductDetail({
+                                  productId,
+                                  onNavigate,
+                                  currentUserId,
+                              }: ProductDetailProps) {
     const [product, setProduct] = useState<Product | null>(null);
     const [loading, setLoading] = useState(true);
+
     const [buying, setBuying] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Gemini summary
+    const [aiText, setAiText] = useState<string | null>(null);
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiError, setAiError] = useState<string | null>(null);
+
     const token = useMemo(() => localStorage.getItem("token"), []);
 
+    // 1) 商品を取得
     useEffect(() => {
         setLoading(true);
         setError(null);
@@ -43,6 +58,46 @@ export function ProductDetail({ productId, onNavigate, currentUserId }: ProductD
             })
             .finally(() => setLoading(false));
     }, [productId]);
+
+    // 2) 商品が取れたら Gemini で要約生成（B案：詳細を見たとき自動）
+    useEffect(() => {
+        if (!product) return;
+
+        setAiLoading(true);
+        setAiError(null);
+        setAiText(null);
+
+        generateProductSummary(product.id)
+            .then((res) => setAiText(res.text))
+            .catch((e: any) => {
+                console.error(e);
+                setAiError(e?.message ?? "AI生成に失敗しました");
+            })
+            .finally(() => setAiLoading(false));
+    }, [product]);
+
+    const isOwnProduct = product?.sellerId === currentUserId;
+    const isSold = product?.status === "sold";
+
+    const handlePurchase = async () => {
+        if (!token) {
+            alert("先にログインしてください（tokenがありません）");
+            return;
+        }
+        if (!product) return;
+
+        setBuying(true);
+        try {
+            await purchaseProduct(product.id, token);
+            alert("購入しました！");
+            onNavigate({ type: "home" });
+        } catch (e: any) {
+            console.error(e);
+            alert(`購入に失敗しました: ${e?.message ?? "unknown error"}`);
+        } finally {
+            setBuying(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -86,27 +141,6 @@ export function ProductDetail({ productId, onNavigate, currentUserId }: ProductD
         );
     }
 
-    const isOwnProduct = product.sellerId === currentUserId;
-    const isSold = product.status === "sold";
-
-    const handlePurchase = async () => {
-        if (!token) {
-            alert("先にログインしてください（tokenがありません）");
-            return;
-        }
-        setBuying(true);
-        try {
-            await purchaseProduct(product.id, token);
-            alert("購入しました！");
-            onNavigate({ type: "home" });
-        } catch (e: any) {
-            console.error(e);
-            alert(`購入に失敗しました: ${e?.message ?? "unknown error"}`);
-        } finally {
-            setBuying(false);
-        }
-    };
-
     return (
         <div className="max-w-md mx-auto min-h-screen bg-white">
             {/* Header */}
@@ -138,13 +172,32 @@ export function ProductDetail({ productId, onNavigate, currentUserId }: ProductD
             <div className="p-6 flex flex-col gap-4">
                 <div>
                     <h1 className="mb-2">{product.title}</h1>
-                    <div className="text-red-600">¥{Number(product.price ?? 0).toLocaleString()}</div>
+                    <div className="text-red-600">
+                        ¥{Number(product.price ?? 0).toLocaleString()}
+                    </div>
                     {product.status && (
                         <div className="mt-1 text-sm text-gray-500">status: {product.status}</div>
                     )}
                 </div>
 
-                <div className="text-gray-600">{product.description}</div>
+                <div className="text-gray-600 whitespace-pre-line">{product.description}</div>
+
+                {/* Gemini Summary */}
+                <div className="mt-2 p-4 bg-gray-50 rounded-lg">
+                    <div className="text-sm text-gray-500 mb-1">Geminiによる紹介</div>
+
+                    {aiLoading && <div className="text-gray-400 text-sm">生成中...</div>}
+
+                    {!aiLoading && aiError && (
+                        <div className="text-red-500 text-sm whitespace-pre-line">{aiError}</div>
+                    )}
+
+                    {!aiLoading && !aiError && (
+                        <div className="text-gray-700 whitespace-pre-line">
+                            {aiText ?? "（生成結果なし）"}
+                        </div>
+                    )}
+                </div>
 
                 {/* Buttons */}
                 {!isOwnProduct && (
