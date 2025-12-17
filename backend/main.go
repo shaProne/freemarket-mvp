@@ -318,9 +318,25 @@ func main() {
 			}
 
 			p.ID = "p_" + time.Now().Format("150405")
-			p.Status = "available"
 			p.CreatedAt = time.Now().Format(time.RFC3339)
 
+			// status デフォルト
+			if p.Status == "" {
+				p.Status = "available"
+			}
+
+			// status バリデーション（3択）
+			if p.Status != "available" && p.Status != "sold" && p.Status != "considering" {
+				http.Error(w, "invalid status", http.StatusBadRequest)
+				return
+			}
+
+			// considering のときは価格を 0 扱い（価格未定）
+			if p.Status == "considering" {
+				p.Price = 0
+			}
+
+			// ここは今まで通り
 			if err := store.Create(p); err != nil {
 				http.Error(w, "failed to create product", http.StatusInternalServerError)
 				return

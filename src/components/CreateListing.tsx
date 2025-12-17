@@ -18,6 +18,7 @@ export function CreateListing({ onNavigate, currentUserId }: CreateListingProps)
 
     const [error, setError] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
+    const [status, setStatus] = useState<"available" | "considering">("available");
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -35,8 +36,13 @@ export function CreateListing({ onNavigate, currentUserId }: CreateListingProps)
     };
 
     const handleSubmit = async () => {
-        if (!name || !price || !description) {
-            setError("すべての項目を入力してください");
+        // considering のときは price 不要
+        if (!name || !description) {
+            setError("商品名と説明は必須です");
+            return;
+        }
+        if (status === "available" && !price) {
+            setError("価格を入力してください");
             return;
         }
 
@@ -53,10 +59,11 @@ export function CreateListing({ onNavigate, currentUserId }: CreateListingProps)
 
             await createProduct({
                 title: name,
-                price: Number(price),
+                price: status === "considering" ? 0 : Number(price),
                 description,
                 sellerId: currentUserId,
-                imageUrl, // ← ここが追加
+                imageUrl,
+                status, // ← considering 対応
             });
 
             onNavigate({ type: "home" });
@@ -125,18 +132,53 @@ export function CreateListing({ onNavigate, currentUserId }: CreateListingProps)
 
                     <div>
                         <label className="block mb-2 text-gray-700">価格</label>
-                        <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">
-                ¥
-              </span>
-                            <input
-                                type="number"
-                                value={price}
-                                onChange={(e) => setPrice(e.target.value)}
-                                className="w-full h-12 pl-8 pr-4 border border-gray-300 rounded-lg outline-none focus:border-blue-600"
-                                placeholder="0"
-                            />
+
+                        {/* 状態選択 */}
+                        <div className="flex gap-2 mb-3">
+                            <button
+                                type="button"
+                                onClick={() => setStatus("available")}
+                                className={`px-3 h-10 rounded-lg border ${
+                                    status === "available"
+                                        ? "bg-blue-600 text-white border-blue-600"
+                                        : "bg-white text-gray-700 border-gray-300"
+                                }`}
+                            >
+                                通常出品
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setStatus("considering")}
+                                className={`px-3 h-10 rounded-lg border ${
+                                    status === "considering"
+                                        ? "bg-yellow-500 text-white border-yellow-500"
+                                        : "bg-white text-gray-700 border-gray-300"
+                                }`}
+                            >
+                                出品考え中（価格未定）
+                            </button>
                         </div>
+
+                        {/* 価格入力は通常出品だけ */}
+                        {status === "available" ? (
+                            <div className="relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">
+                                    ¥
+                                </span>
+                                <input
+                                    type="number"
+                                    value={price}
+                                    onChange={(e) => setPrice(e.target.value)}
+                                    className="w-full h-12 pl-8 pr-4 border border-gray-300 rounded-lg outline-none focus:border-blue-600"
+                                    placeholder="0"
+                                />
+                            </div>
+                        ) : (
+                            <div className="h-12 flex items-center px-4 rounded-lg bg-gray-100 text-gray-600">
+                                価格：未定
+                            </div>
+                        )}
                     </div>
 
                     <div>

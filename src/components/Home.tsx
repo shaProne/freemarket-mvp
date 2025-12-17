@@ -166,9 +166,15 @@ export function Home({ onNavigate }: HomeProps) {
                                 </div>
 
                                 <div className="p-3 flex flex-col items-start gap-1">
-                                    <div className="text-red-600">
-                                        ¥{Number(product.price ?? 0).toLocaleString()}
-                                    </div>
+                                    {product.status === "considering" ? (
+                                        <div className="text-red-600">出品検討中</div>
+                                    ) : (
+                                        <div className="text-red-600">
+                                            {product.status === "considering"
+                                                ? "出品検討中"
+                                                : `¥${Number(product.price ?? 0).toLocaleString()}`}
+                                        </div>
+                                    )}
                                     <div className="text-sm text-left line-clamp-2">
                                         {product.title}
                                     </div>

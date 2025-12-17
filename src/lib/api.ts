@@ -14,11 +14,15 @@ export type Product = {
 };
 
 
-export async function fetchProducts(token?: string): Promise<Product[]> {
-    const res = await fetch(`${API_BASE}/products`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!res.ok) throw new Error("failed to fetch");
+export async function fetchProducts(token?: string) {
+    const headers: HeadersInit = { "Content-Type": "application/json" };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE}/products`, { headers });
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `failed to fetch (${res.status})`);
+    }
     return res.json();
 }
 
@@ -29,6 +33,7 @@ export async function createProduct(product: {
     description: string;
     sellerId: string;
     imageUrl?: string;
+    status?: "available" | "considering";
 }) {
     const res = await fetch(`${API_BASE}/products`, {
         method: "POST",

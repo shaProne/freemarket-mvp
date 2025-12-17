@@ -82,6 +82,7 @@ export function ProductDetail({
 
     const isOwnProduct = product?.sellerId === currentUserId;
     const isSold = product?.status === "sold";
+    const isConsidering = product?.status === "considering";
 
     const handlePurchase = async () => {
         if (!token) {
@@ -113,11 +114,16 @@ export function ProductDetail({
         // 楽観的UI更新
         const nextLiked = !(product.likedByMe ?? false);
         const nextCount = (product.likeCount ?? 0) + (nextLiked ? 1 : -1);
-        setProduct({ ...product, likedByMe: nextLiked, likeCount: Math.max(0, nextCount) });
+        const optimistic = {
+            ...product,
+            likedByMe: nextLiked,
+            likeCount: Math.max(0, nextCount),
+        };
+        setProduct(optimistic);
 
         try {
             const res = await toggleLike(product.id, token);
-            setProduct({ ...product, likedByMe: res.liked, likeCount: res.likeCount });
+            setProduct({ ...optimistic, likedByMe: res.liked, likeCount: res.likeCount });
         } catch (e: any) {
             console.error(e);
             alert(e?.message ?? "いいねに失敗しました");
@@ -195,9 +201,7 @@ export function ProductDetail({
                     className="flex items-center gap-1 px-2 py-1 rounded-full hover:bg-gray-100"
                 >
                     <Heart
-                        className={`w-6 h-6 ${
-                            liked ? "fill-red-500 text-red-500" : "text-gray-500"
-                        }`}
+                        className={`w-6 h-6 ${liked ? "fill-red-500 text-red-500" : "text-gray-500"}`}
                     />
                     <span className="text-sm text-gray-700">{likeCount}</span>
                 </button>
@@ -219,15 +223,28 @@ export function ProductDetail({
             <div className="p-6 flex flex-col gap-4">
                 <div>
                     <h1 className="mb-2">{product.title}</h1>
-                    <div className="text-red-600">
-                        ¥{Number(product.price ?? 0).toLocaleString()}
-                    </div>
+
+                    {/* ★ここ：considering のとき 0円表示しない */}
+                    {isConsidering ? (
+                        <div className="text-gray-600">価格：未定</div>
+                    ) : (
+                        <div className="text-red-600">
+                            ¥{Number(product.price ?? 0).toLocaleString()}
+                        </div>
+                    )}
+
                     {product.status && (
                         <div className="mt-1 text-sm text-gray-500">status: {product.status}</div>
                     )}
                 </div>
 
                 <div className="text-gray-600 whitespace-pre-line">{product.description}</div>
+
+                {!isOwnProduct && isConsidering && (
+                    <div className="mt-2 p-4 bg-yellow-50 rounded-lg text-yellow-800 text-sm">
+                        この商品は出品検討中です。出品者と価格の合意が取れ次第購入できます。
+                    </div>
+                )}
 
                 {/* Gemini Summary */}
                 <div className="mt-2 p-4 bg-gray-50 rounded-lg">
@@ -249,16 +266,20 @@ export function ProductDetail({
                 {/* Buttons */}
                 {!isOwnProduct && (
                     <div className="flex flex-col gap-3 mt-4">
-                        <button
-                            disabled={buying || isSold}
-                            onClick={handlePurchase}
-                            className={`w-full h-12 rounded-lg text-white ${
-                                buying || isSold ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
-                            }`}
-                        >
-                            {isSold ? "売り切れ" : buying ? "購入中..." : "購入する"}
-                        </button>
+                        {/* ★購入は considering のとき出さない */}
+                        {!isConsidering && (
+                            <button
+                                disabled={buying || isSold}
+                                onClick={handlePurchase}
+                                className={`w-full h-12 rounded-lg text-white ${
+                                    buying || isSold ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
+                                }`}
+                            >
+                                {isSold ? "売り切れ" : buying ? "購入中..." : "購入する"}
+                            </button>
+                        )}
 
+                        {/* ★DMは常に出す（consideringでもOK） */}
                         <button
                             onClick={() =>
                                 onNavigate({
