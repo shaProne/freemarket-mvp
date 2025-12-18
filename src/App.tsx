@@ -6,6 +6,7 @@ import { Chat } from "./components/Chat";
 import { MyPage } from "./components/MyPage";
 import { Login } from "./components/Login";
 import { Signup } from "./components/Signup";
+import { Inbox } from "./components/Inbox"; // パスは君の構成に合わせて
 
 export type Product = {
     id: string;
@@ -32,7 +33,13 @@ export type Screen =
     | { type: "home" }
     | { type: "productDetail"; productId: string }
     | { type: "createListing" }
-    | { type: "chat"; otherUserId: string; otherUserName: string }
+    | { type: "inbox"; productId: string } // ← 追加
+    | {
+    type: "chat";
+    otherUserId: string;
+    otherUserName: string;
+    productId: string; // ← 追加
+}
     | { type: "myPage" };
 
 export default function App() {
@@ -108,10 +115,19 @@ export default function App() {
                     <CreateListing onNavigate={setCurrentScreen} currentUserId={currentUserId}/>
                 )}
 
+                {currentScreen.type === "inbox" && (
+                    <Inbox
+                        productId={currentScreen.productId}
+                        currentUserId={currentUserId}
+                        onNavigate={setCurrentScreen}
+                    />
+                )}
+
                 {currentScreen.type === "chat" && (
                     <Chat
                         otherUserId={currentScreen.otherUserId}
                         otherUserName={currentScreen.otherUserName}
+                        productId={currentScreen.productId}
                         currentUserId={currentUserId}
                         onNavigate={setCurrentScreen}
                     />

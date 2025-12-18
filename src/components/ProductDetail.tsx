@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Heart } from "lucide-react";
 import { Screen } from "../App";
+import { fetchUserById } from "../lib/api";
 import {
     fetchProducts,
     purchaseProduct,
@@ -34,7 +35,7 @@ export function ProductDetail({
                               }: ProductDetailProps) {
     const [product, setProduct] = useState<Product | null>(null);
     const [loading, setLoading] = useState(true);
-
+    const [sellerDisplayName, setSellerDisplayName] = useState<string>("");
     const [buying, setBuying] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -78,6 +79,14 @@ export function ProductDetail({
                 setAiError(e?.message ?? "AI生成に失敗しました");
             })
             .finally(() => setAiLoading(false));
+    }, [product]);
+
+    useEffect(() => {
+        if (!product) return;
+
+        fetchUserById(product.sellerId)
+            .then((u) => setSellerDisplayName(u.displayName))
+            .catch(() => setSellerDisplayName(product.sellerId));
     }, [product]);
 
     const isOwnProduct = product?.sellerId === currentUserId;
@@ -285,7 +294,8 @@ export function ProductDetail({
                                 onNavigate({
                                     type: "chat",
                                     otherUserId: product.sellerId,
-                                    otherUserName: `出品者 (${product.sellerId})`,
+                                    otherUserName: `出品者(${sellerDisplayName})`,
+                                    productId: product.id, // ← 追加
                                 })
                             }
                             className="w-full h-12 border-2 border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50"
@@ -296,8 +306,17 @@ export function ProductDetail({
                 )}
 
                 {isOwnProduct && (
-                    <div className="mt-4 p-4 bg-gray-100 rounded-lg text-center text-gray-600">
-                        あなたが出品した商品です
+                    <div className="mt-4 flex flex-col gap-3">
+                        <div className="p-4 bg-gray-100 rounded-lg text-center text-gray-600">
+                            あなたが出品した商品です
+                        </div>
+
+                        <button
+                            onClick={() => product && onNavigate({ type: "inbox", productId: product.id })}
+                            className="w-full h-12 border-2 border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50"
+                        >
+                            メッセージへ
+                        </button>
                     </div>
                 )}
             </div>

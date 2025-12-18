@@ -99,6 +99,75 @@ export async function generateProductSummary(productId: string) {
     return res.json() as Promise<{ text: string }>;
 }
 
+// DM
+export async function fetchMessages(otherUserId: string, productId: string, token: string) {
+    const res = await fetch(
+        `${API_BASE}/messages?otherUserId=${encodeURIComponent(otherUserId)}&productId=${encodeURIComponent(productId)}`,
+        {
+            headers: { Authorization: `Bearer ${token}` },
+        }
+    );
+
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "failed to fetch messages");
+    }
+
+    return res.json() as Promise<
+        { id: string; productId: string; fromUserId: string; toUserId: string; body: string; createdAt: string }[]
+    >;
+}
+
+export async function sendMessage(toUserId: string, productId: string, body: string, token: string) {
+    const res = await fetch(`${API_BASE}/messages`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ toUserId, productId, body }),
+    });
+
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "failed to send message");
+    }
+
+    return res.json() as Promise<{
+        id: string;
+        productId: string;
+        fromUserId: string;
+        toUserId: string;
+        body: string;
+        createdAt: string;
+    }>;
+}
+
+export async function fetchUserById(userId: string) {
+    const res = await fetch(`${API_BASE}/users/${userId}`);
+
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "failed to fetch user");
+    }
+
+    return res.json() as Promise<{
+        userId: string;
+        displayName: string;
+        mbti: string;
+    }>;
+}
+
+export async function fetchProductChats(productId: string, token: string) {
+    const res = await fetch(`${API_BASE}/product-chats?productId=${encodeURIComponent(productId)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(text || "failed to fetch product chats");
+    return JSON.parse(text) as Array<{ userId: string; displayName: string }>;
+}
+
+
 export async function login(userId: string, password: string) {
     const res = await fetch("http://localhost:8080/login", {
         method: "POST",

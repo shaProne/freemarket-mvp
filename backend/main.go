@@ -12,7 +12,7 @@ import (
 	"freemarket-backend/domain"
 	"freemarket-backend/middleware"
 	"freemarket-backend/repository"
-
+	"github.com/joho/godotenv" // ← ★追加
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -54,6 +54,12 @@ func tryGetUserID(r *http.Request) (string, bool) {
 // ===== App =====
 
 func main() {
+
+	// ★ これを最初に書く（他より上）
+	if err := godotenv.Load(); err != nil {
+		log.Println("⚠️ .env not found (using OS env vars)")
+	}
+
 	database, err := db.NewDB()
 	if err != nil {
 		log.Fatal(err)
@@ -62,6 +68,7 @@ func main() {
 	store := repository.NewSQLiteProductRepository(database)
 	userRepo := repository.NewUserRepository(database)
 	likeRepo := repository.NewSQLiteLikeRepository(database)
+	msgRepo := repository.NewSQLiteMessageRepository(database)
 
 	mux := http.NewServeMux()
 
@@ -188,7 +195,7 @@ func main() {
 		}),
 	))
 
-	// ===== Likes API =====
+	// ===== Likes API (toggle) =====
 	// POST /likes  { productId: "p_xxx" }
 	// Authorization: Bearer <token>
 	// → 既にいいね済みなら Unlike、未いいねなら Like（= toggle）
@@ -213,7 +220,6 @@ func main() {
 				return
 			}
 
-			// toggle
 			liked, err := likeRepo.IsLiked(req.ProductID, userID)
 			if err != nil {
 				log.Println("likeRepo.IsLiked error:", err)
@@ -235,7 +241,6 @@ func main() {
 				}
 			}
 
-			// 最新のいいね数を返す
 			cnt, err := likeRepo.CountByProduct(req.ProductID)
 			if err != nil {
 				log.Println("likeRepo.CountByProduct error:", err)
@@ -244,43 +249,19 @@ func main() {
 			}
 
 			w.Header().Set("Content-Type", "application/json")
+			// フロント(toggleLike)は { liked, likeCount } を期待してるのでそれに合わせる
 			json.NewEncoder(w).Encode(map[string]any{
-				"liked": !liked, // toggle後の状態
-				"count": cnt,
+				"liked":     !liked,
+				"likeCount": cnt,
 			})
 		}),
 	))
-
-	// GET /likes/count?productId=p_xxx  → { count: 3 }
-	mux.HandleFunc("/likes/count", withCORS(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		productID := r.URL.Query().Get("productId")
-		if productID == "" {
-			http.Error(w, "productId is required", http.StatusBadRequest)
-			return
-		}
-
-		cnt, err := likeRepo.CountByProduct(productID)
-		if err != nil {
-			log.Println("likeRepo.CountByProduct error:", err)
-			http.Error(w, "failed to count likes", http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"count": cnt})
-	}))
 
 	// ===== Product API =====
 	mux.HandleFunc("/products", withCORS(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		switch r.Method {
-
 		case http.MethodGet:
 			products, err := store.List()
 			if err != nil {
@@ -336,7 +317,6 @@ func main() {
 				p.Price = 0
 			}
 
-			// ここは今まで通り
 			if err := store.Create(p); err != nil {
 				http.Error(w, "failed to create product", http.StatusInternalServerError)
 				return
@@ -349,50 +329,6 @@ func main() {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	}))
-
-	// ===== Like Toggle API =====
-	mux.HandleFunc("/likes/toggle", withCORS(
-		middleware.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != http.MethodPost {
-				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-				return
-			}
-
-			var req struct {
-				ProductID string `json:"productId"`
-			}
-			if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ProductID == "" {
-				http.Error(w, "invalid request", http.StatusBadRequest)
-				return
-			}
-
-			userID, ok := middleware.UserIDFromContext(r.Context())
-			if !ok {
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
-				return
-			}
-
-			liked, err := likeRepo.IsLiked(req.ProductID, userID)
-			if err != nil {
-				http.Error(w, "db error", http.StatusInternalServerError)
-				return
-			}
-
-			if liked {
-				_ = likeRepo.Unlike(req.ProductID, userID)
-			} else {
-				_ = likeRepo.Like(req.ProductID, userID)
-			}
-
-			count, _ := likeRepo.CountByProduct(req.ProductID)
-
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]any{
-				"liked":     !liked,
-				"likeCount": count,
-			})
-		}),
-	))
 
 	// ===== GEMINI API =====
 	mux.HandleFunc("/ai/product-summary", withCORS(func(w http.ResponseWriter, r *http.Request) {
@@ -427,6 +363,148 @@ func main() {
 			"text": text,
 		})
 	}))
+
+	// ===== Messages API =====
+	// 商品単位で会話するので query に productId 必須
+	mux.HandleFunc("/messages", withCORS(
+		middleware.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+			userID, ok := middleware.UserIDFromContext(r.Context())
+			if !ok {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+
+			switch r.Method {
+			case http.MethodGet:
+				other := r.URL.Query().Get("otherUserId")
+				productID := r.URL.Query().Get("productId")
+				if other == "" || productID == "" {
+					http.Error(w, "otherUserId and productId are required", http.StatusBadRequest)
+					return
+				}
+
+				msgs, err := msgRepo.ListConversation(userID, other, productID)
+				if err != nil {
+					http.Error(w, "failed to list messages", http.StatusInternalServerError)
+					return
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(msgs)
+
+			case http.MethodPost:
+				var req struct {
+					ToUserID  string `json:"toUserId"`
+					ProductID string `json:"productId"`
+					Body      string `json:"body"`
+				}
+				if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+					http.Error(w, "invalid request", http.StatusBadRequest)
+					return
+				}
+				if req.ToUserID == "" || req.ProductID == "" || req.Body == "" {
+					http.Error(w, "toUserId, productId and body are required", http.StatusBadRequest)
+					return
+				}
+
+				m := domain.Message{
+					ID:         "m_" + time.Now().Format("150405.000000000"),
+					ProductID:  req.ProductID,
+					FromUserID: userID,
+					ToUserID:   req.ToUserID,
+					Body:       req.Body,
+					CreatedAt:  time.Now().Format(time.RFC3339),
+				}
+
+				if err := msgRepo.Create(m); err != nil {
+					http.Error(w, "failed to send message", http.StatusInternalServerError)
+					return
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(m)
+
+			default:
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			}
+		}),
+	))
+
+	// ===== User API =====
+	mux.HandleFunc("/users/", withCORS(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		userID := strings.TrimPrefix(r.URL.Path, "/users/")
+		if userID == "" {
+			http.Error(w, "userId required", http.StatusBadRequest)
+			return
+		}
+
+		u, err := userRepo.FindByID(userID)
+		if err != nil {
+			http.Error(w, "user not found", http.StatusNotFound)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"userId":      u.ID,
+			"displayName": u.DisplayName,
+			"mbti":        u.MBTI,
+		})
+	}))
+
+	// ===== Product Chat Users API =====
+	// 商品ごとにDMしてきたユーザー一覧（相手一覧）
+	mux.HandleFunc("/product-chats", withCORS(
+		middleware.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodGet {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+
+			userID, ok := middleware.UserIDFromContext(r.Context())
+			if !ok {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+
+			productID := r.URL.Query().Get("productId")
+			if productID == "" {
+				http.Error(w, "productId is required", http.StatusBadRequest)
+				return
+			}
+
+			userIDs, err := msgRepo.ListChatUsersByProduct(userID, productID)
+			if err != nil {
+				http.Error(w, "failed to list chat users", http.StatusInternalServerError)
+				return
+			}
+
+			type ChatUser struct {
+				UserID      string `json:"userId"`
+				DisplayName string `json:"displayName"`
+			}
+
+			var res []ChatUser
+			for _, uid := range userIDs {
+				u, err := userRepo.FindByID(uid)
+				if err != nil {
+					continue
+				}
+				res = append(res, ChatUser{
+					UserID:      uid,
+					DisplayName: u.DisplayName,
+				})
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(res)
+		}),
+	))
 
 	// ===== Purchase API =====
 	mux.HandleFunc("/purchase", withCORS(
