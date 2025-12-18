@@ -1,4 +1,6 @@
-const API_BASE = "https://freemarket-mvp-848758625596.asia-northeast1.run.app";
+const API_BASE =
+    import.meta.env.VITE_API_BASE_URL ||
+    "http://localhost:8080";
 
 export type Product = {
     id: string;

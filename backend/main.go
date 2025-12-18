@@ -28,7 +28,7 @@ func withCORS(h http.HandlerFunc) http.HandlerFunc {
 		}
 
 		if allowed[origin] {
-			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Origin", "*")
 		}
 
 		w.Header().Set("Vary", "Origin")
