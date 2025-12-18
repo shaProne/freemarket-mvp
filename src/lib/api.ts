@@ -205,7 +205,7 @@ export async function fetchMe(token: string) {
 }
 
 export async function toggleLike(productId: string, token: string) {
-    const res = await fetch(`${API_BASE}/likes/toggle`, {
+    const res = await fetch(`${API_BASE}/likes`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -213,8 +213,12 @@ export async function toggleLike(productId: string, token: string) {
         },
         body: JSON.stringify({ productId }),
     });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json() as Promise<{ liked: boolean; likeCount: number }>;
+
+    const text = await res.text();
+    if (!res.ok) throw new Error(text || "failed to toggle like");
+
+    // バックが {"likeCount":2,"liked":true} を返している前提
+    return JSON.parse(text) as { liked: boolean; likeCount: number };
 }
 
 export async function fetchProductsAuthed(token?: string) {
