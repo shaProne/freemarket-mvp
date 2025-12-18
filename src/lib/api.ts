@@ -71,12 +71,11 @@ export async function purchaseProduct(productId: string, token: string) {
 }
 
 export async function signup(userId: string, password: string, displayName: string, mbti: string) {
-    const res = await fetch("http://localhost:8080/signup", {
+    const res = await fetch(`${API_BASE}/signup`, {   // ←ここ
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, password, mbti }),
     });
-
     if (!res.ok) {
         const text = await res.text();
         throw new Error(text || "signup failed");
@@ -170,7 +169,7 @@ export async function fetchProductChats(productId: string, token: string) {
 
 
 export async function login(userId: string, password: string) {
-    const res = await fetch("http://localhost:8080/login", {
+    const res = await fetch(`${API_BASE}/login`, {    // ←ここ
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, password }),
