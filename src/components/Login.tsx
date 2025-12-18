@@ -44,7 +44,7 @@ export function Login({ onNavigate }: { onNavigate: (screen: Screen) => void }) 
             <label className="block mt-4 mb-2 text-gray-700">Password</label>
             <input
                 type="password"
-                className="w-full h-12 px-4 border border-gray-300 rounded-lg outline-none focus:border-blue-600"
+                className="w-full h-12 px-4 border border-gray-300 rounded-lg outline-none focus:border-blue-600 mb-4"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="pass1234"

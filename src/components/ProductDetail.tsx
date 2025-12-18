@@ -64,7 +64,7 @@ export function ProductDetail({
             .finally(() => setLoading(false));
     }, [productId, token]);
 
-    // 2) 商品が取れたら Gemini で要約生成（B案：詳細を見たとき自動）
+    // 2) 商品が取れたら Gemini で要約生成
     useEffect(() => {
         if (!product) return;
 
@@ -74,9 +74,23 @@ export function ProductDetail({
 
         generateProductSummary(product.id)
             .then((res) => setAiText(res.text))
-            .catch((e: any) => {
+            .catch(async (e: any) => {
                 console.error(e);
-                setAiError(e?.message ?? "AI生成に失敗しました");
+
+                const raw = String(e?.message ?? "");
+                const is503 =
+                    raw.includes("status=503") ||
+                    raw.includes('"code": 503') ||
+                    raw.includes("UNAVAILABLE") ||
+                    raw.toLowerCase().includes("overloaded");
+
+                if (is503) {
+                    setAiError(
+                        "いまAIが混み合っているみたいです。少し時間をおいて、もう一度お試しください。"
+                    );
+                } else {
+                    setAiError("AI紹介文の生成に失敗しました。もう一度お試しください。");
+                }
             })
             .finally(() => setAiLoading(false));
     }, [product]);
@@ -279,12 +293,14 @@ export function ProductDetail({
                         {!isConsidering && (
                             <button
                                 disabled={buying || isSold}
-                                onClick={handlePurchase}
+                                onClick={() =>
+                                    onNavigate({ type: "purchaseConfirm", productId: product.id })
+                                }
                                 className={`w-full h-12 rounded-lg text-white ${
                                     buying || isSold ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
                                 }`}
                             >
-                                {isSold ? "売り切れ" : buying ? "購入中..." : "購入する"}
+                                {isSold ? "売り切れ" : "購入する"}
                             </button>
                         )}
 

@@ -7,6 +7,8 @@ import { MyPage } from "./components/MyPage";
 import { Login } from "./components/Login";
 import { Signup } from "./components/Signup";
 import { Inbox } from "./components/Inbox"; // パスは君の構成に合わせて
+import { PurchaseConfirm } from "./components/PurchaseConfirm";
+import { PurchaseDone } from "./components/PurchaseDone";
 
 export type Product = {
     id: string;
@@ -40,7 +42,9 @@ export type Screen =
     otherUserName: string;
     productId: string; // ← 追加
 }
-    | { type: "myPage" };
+    | { type: "myPage" }
+    | { type: "purchaseConfirm"; productId: string }
+    | { type: "purchaseDone"; productId: string; sellerId: string; sellerName: string };
 
 export default function App() {
     const hasToken = !!localStorage.getItem("token");
@@ -135,6 +139,24 @@ export default function App() {
 
                 {currentScreen.type === "myPage" && (
                     <MyPage onNavigate={setCurrentScreen} currentUserId={currentUserId}/>
+                )}
+
+                {currentScreen.type === "purchaseConfirm" && (
+                    <PurchaseConfirm
+                        productId={currentScreen.productId}
+                        currentUserId={currentUserId}
+                        onNavigate={setCurrentScreen}
+                    />
+                )}
+
+                {currentScreen.type === "purchaseDone" && (
+                    <PurchaseDone
+                        productId={currentScreen.productId}
+                        sellerId={currentScreen.sellerId}
+                        sellerName={currentScreen.sellerName}
+                        currentUserId={currentUserId}
+                        onNavigate={setCurrentScreen}
+                    />
                 )}
             </div>
         </div>
