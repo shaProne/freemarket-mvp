@@ -23,8 +23,8 @@ func withCORS(h http.HandlerFunc) http.HandlerFunc {
 		origin := r.Header.Get("Origin")
 
 		allowed := map[string]bool{
-			"http://localhost:3000":         true,
-			"https://<あなたのvercelのURL>": true, // ←ここを実際のURLに
+			"http://localhost:3000":              true,
+			"https://freemarket-mvp.vercel.app/": true, // ←ここを実際のURLに
 		}
 
 		if allowed[origin] {
