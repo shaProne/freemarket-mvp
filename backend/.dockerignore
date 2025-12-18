@@ -1,0 +1,6 @@
+.git
+.idea
+*.db
+*.sqlite
+node_modules
+dist

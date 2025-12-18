@@ -2,11 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"log"
-	"net/http"
-	"strings"
-	"time"
-
 	"freemarket-backend/auth"
 	"freemarket-backend/db"
 	"freemarket-backend/domain"
@@ -14,6 +9,11 @@ import (
 	"freemarket-backend/repository"
 	"github.com/joho/godotenv" // ← ★追加
 	"golang.org/x/crypto/bcrypt"
+	"log"
+	"net/http"
+	"os"
+	"strings"
+	"time"
 )
 
 // ===== CORS =====
@@ -538,6 +538,10 @@ func main() {
 		}),
 	))
 
-	log.Println("Backend running at :8080")
-	log.Fatal(http.ListenAndServe(":8080", mux))
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	log.Println("Listening on port", port)
+	log.Fatal(http.ListenAndServe(":"+port, mux))
 }
