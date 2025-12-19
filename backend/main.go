@@ -97,8 +97,12 @@ func main() {
 
 	store := repository.NewSQLiteProductRepository(database)
 	userRepo := repository.NewUserRepository(database)
-	likeRepo := repository.NewSQLiteLikeRepository(database)
 	msgRepo := repository.NewSQLiteMessageRepository(database)
+
+	// これを消す
+	// likeRepo := repository.NewSQLiteLikeRepository(database)
+	// これに変更
+	likeRepo := repository.NewLikeRepository(database)
 
 	mux := http.NewServeMux()
 
