@@ -2,29 +2,31 @@ package db
 
 import (
 	"database/sql"
+	"fmt"
+	"os"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 func NewDB() (*sql.DB, error) {
-	db, err := sql.Open("sqlite3", "./data.db")
+	// Cloud Run で設定した環境変数を使う
+	user := os.Getenv("DB_USER")
+	pass := os.Getenv("DB_PASS")
+	host := os.Getenv("DB_HOST") // 例: 127.0.0.1 (Cloud SQL Auth Proxy)
+	port := os.Getenv("DB_PORT") // 3306
+	name := os.Getenv("DB_NAME")
+
+	dsn := fmt.Sprintf(
+		"%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4",
+		user, pass, host, port, name,
+	)
+
+	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		return nil, err
 	}
 
-	// テーブル作成
-	_, err = db.Exec(`
-	CREATE TABLE IF NOT EXISTS products (
-		id TEXT PRIMARY KEY,
-		title TEXT,
-		price INTEGER,
-		description TEXT,
-		seller_id TEXT,
-		status TEXT,
-		created_at TEXT
-	);
-	`)
-	if err != nil {
+	if err := db.Ping(); err != nil {
 		return nil, err
 	}
 
