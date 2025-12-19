@@ -222,21 +222,20 @@ export async function toggleLike(productId: string, token: string) {
 }
 
 
-export async function fetchMbtiAdvice(
-    myMbti: string,
-    sellerMbti: string
-): Promise<string> {
-    const res = await fetch(
-        `${import.meta.env.VITE_API_BASE}/ai/mbti-advice`,
-        {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-            body: JSON.stringify({ myMbti, sellerMbti }),
-        }
-    );
+export async function fetchMbtiAdvice(myMbti: string, sellerMbti: string) {
+    const res = await fetch(`${import.meta.env.VITE_API_BASE}/ai/mbti-advice`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ myMbti, sellerMbti }),
+    });
+
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `status=${res.status}`);
+    }
+
+    return (await res.json()) as { text: string };
+}
 
     if (!res.ok) {
         throw new Error("failed to fetch mbti advice");

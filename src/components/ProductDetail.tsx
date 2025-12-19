@@ -9,6 +9,9 @@ import {
     toggleLike,
 } from "../lib/api";
 
+import { fetchMbtiAdvice } from "../lib/api";
+
+
 type ProductDetailProps = {
     productId: string;
     onNavigate: (screen: Screen) => void;
@@ -115,13 +118,13 @@ export function ProductDetail({
     useEffect(() => {
         if (!product?.sellerId) return;
 
-        fetch(`${import.meta.env.VITE_API_BASE}/users/${product.sellerId}`)
-            .then(res => res.json())
-            .then(data => {
-                setSeller({
-                    displayName: data.displayName,
-                    mbti: data.mbti,
-                });
+        fetchUserById(product.sellerId)
+            .then((u) => {
+                setSeller({ displayName: u.displayName, mbti: u.mbti });
+            })
+            .catch((e) => {
+                console.error(e);
+                setSeller(null);
             });
     }, [product?.sellerId]);
 
@@ -133,7 +136,7 @@ export function ProductDetail({
 
         setLoadingAdvice(true);
         fetchMbtiAdvice(myMbti, seller.mbti)
-            .then(setMbtiAdvice)
+            .then((res) => setMbtiAdvice(res.text))
             .catch(() => setMbtiAdvice(null))
             .finally(() => setLoadingAdvice(false));
     }, [seller?.mbti]);
@@ -402,7 +405,7 @@ export function ProductDetail({
                         )}
                     </div>
                 )}
-            
+
             </div>
         </div>
     );
