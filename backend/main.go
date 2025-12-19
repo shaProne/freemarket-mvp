@@ -495,7 +495,18 @@ func main() {
 	}))
 
 	// POST /ai/mbti-advice
-	mux.HandleFunc("/ai/mbti-advice", withCORS(
+	// ===== MBTI Advice API =====
+	// POST /ai/mbti-advice
+	// Authorization: Bearer <token>
+	mux.HandleFunc("/ai/mbti-advice", withCORS(func(w http.ResponseWriter, r *http.Request) {
+
+		// ★ preflight は認証を通さない
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		// ★ ここから認証必須
 		middleware.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodPost {
 				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -507,16 +518,20 @@ func main() {
 				SellerMBTI string `json:"sellerMbti"`
 				BuyerMBTI  string `json:"buyerMbti"`
 			}
+
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 				http.Error(w, "invalid request", http.StatusBadRequest)
 				return
 			}
 
+			if req.SellerMBTI == "" || req.BuyerMBTI == "" {
+				http.Error(w, "mbti required", http.StatusBadRequest)
+				return
+			}
+
 			prompt := fmt.Sprintf(`
 あなたはフリマアプリのアシスタントです。
-
-出品者と購入希望者のMBTIをもとに、
-以下を日本語で簡潔に（3〜4文）説明してください。
+出品者と購入希望者のMBTIをもとに、以下を日本語で簡潔に（3〜4文）説明してください。
 
 1. 出品者の性格傾向
 2. 両者の相性
@@ -529,17 +544,19 @@ MBTI: %s
 購入者MBTI: %s
 `, req.SellerName, req.SellerMBTI, req.BuyerMBTI)
 
-			text, err := auth.GenerateText(prompt) // 既存Gemini関数を流用
+			text, err := auth.GenerateText(prompt)
 			if err != nil {
+				log.Println("GenerateText error:", err)
 				http.Error(w, "AI error", http.StatusInternalServerError)
 				return
 			}
 
+			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]string{
 				"text": text,
 			})
-		}),
-	))
+		})(w, r)
+	}))
 
 	// ===== Product Chat Users API =====
 	// 商品ごとにDMしてきたユーザー一覧（相手一覧）
