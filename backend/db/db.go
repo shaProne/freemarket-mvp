@@ -4,33 +4,34 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-
-	_ "github.com/go-sql-driver/mysql"
+	"strings"
 )
 
 func NewDB() (*sql.DB, error) {
-	// Cloud Run で設定した環境変数を使う
 	user := os.Getenv("DB_USER")
 	pass := os.Getenv("DB_PASS")
-	host := os.Getenv("DB_HOST") // 例: 127.0.0.1 (Cloud SQL Auth Proxy)
 	name := os.Getenv("DB_NAME")
+	host := os.Getenv("DB_HOST") // /cloudsql/PROJECT:REGION:INSTANCE
 
-	dsn := fmt.Sprintf(
-		"%s:%s@unix(%s)/%s?parseTime=true&charset=utf8mb4",
-		user,
-		pass,
-		host, // ← /cloudsql/INSTANCE_CONNECTION_NAME
-		name,
-	)
+	var dsn string
 
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		return nil, err
+	if strings.HasPrefix(host, "/cloudsql/") {
+		// ✅ Cloud Run（UNIX socket）
+		dsn = fmt.Sprintf(
+			"%s:%s@unix(%s)/%s?parseTime=true&charset=utf8mb4",
+			user, pass, host, name,
+		)
+	} else {
+		// ✅ local（TCP）
+		port := os.Getenv("DB_PORT")
+		if port == "" {
+			port = "3306"
+		}
+		dsn = fmt.Sprintf(
+			"%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4",
+			user, pass, host, port, name,
+		)
 	}
 
-	if err := db.Ping(); err != nil {
-		return nil, err
-	}
-
-	return db, nil
+	return sql.Open("mysql", dsn)
 }
