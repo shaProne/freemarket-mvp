@@ -19,27 +19,41 @@ import (
 
 // ===== CORS =====
 
+func isAllowedOrigin(origin string) bool {
+	if origin == "" {
+		return false
+	}
+	// ローカル（Viteなら5173もよく使う）
+	if origin == "http://localhost:3000" || origin == "http://localhost:5173" {
+		return true
+	}
+	// Vercel: 本番 + preview まとめて許可
+	if origin == "https://freemarket-mvp.vercel.app" {
+		return true
+	}
+	if strings.HasSuffix(origin, ".vercel.app") && strings.HasPrefix(origin, "https://") {
+		return true
+	}
+	return false
+}
+
 func withCORS(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
 
-		allowed := map[string]bool{
-			"http://localhost:3000":             true,
-			"https://freemarket-mvp.vercel.app": true, // ← スラッシュ無し
+		if isAllowedOrigin(origin) {
+			w.Header().Set("Access-Control-Allow-Origin", origin) // 反射
+			w.Header().Set("Vary", "Origin")
 		}
 
-		if allowed[origin] {
-			w.Header().Set("Access-Control-Allow-Origin", origin) // ← "*" じゃなく origin
-		}
-
-		w.Header().Set("Vary", "Origin")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusOK)
+			w.WriteHeader(http.StatusNoContent) // 204
 			return
 		}
+
 		h(w, r)
 	}
 }
