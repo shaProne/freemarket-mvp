@@ -253,7 +253,7 @@ export function PurchaseConfirm({
                 </button>
 
                 <div className="text-xs text-gray-500 text-center">
-                    ※ デモなので、入力内容は保存されません
+                    ※ デモなので、入力内容は保存されないピィ
                 </div>
             </div>
         </div>
