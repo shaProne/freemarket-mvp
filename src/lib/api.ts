@@ -234,14 +234,7 @@ export async function fetchMbtiAdvice(myMbti: string, sellerMbti: string) {
         throw new Error(text || `status=${res.status}`);
     }
 
-    return (await res.json()) as { text: string };
-}
-
-    if (!res.ok) {
-        throw new Error("failed to fetch mbti advice");
-    }
-
-    const data = await res.json();
+    const data = (await res.json()) as { text: string };
     return data.text;
 }
 
