@@ -7,13 +7,14 @@ import (
 	"freemarket-backend/domain"
 	"freemarket-backend/middleware"
 	"freemarket-backend/repository"
-	"github.com/joho/godotenv" // ← ★追加
-	"golang.org/x/crypto/bcrypt"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/joho/godotenv" // ← ★追加
+	"golang.org/x/crypto/bcrypt"
 )
 
 // ===== CORS =====
@@ -73,7 +74,8 @@ func main() {
 
 	database, err := db.NewDB()
 	if err != nil {
-		log.Fatal(err)
+		log.Println("DB connection failed:", err)
+		// return せず続行（最低でも HTTP サーバは立てる）
 	}
 
 	store := repository.NewSQLiteProductRepository(database)
