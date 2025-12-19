@@ -74,7 +74,7 @@ export async function signup(userId: string, password: string, displayName: stri
     const res = await fetch(`${API_BASE}/signup`, {   // ←ここ
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, password, mbti }),
+        body: JSON.stringify({ userId, password, displayName, mbti }),
     });
     if (!res.ok) {
         const text = await res.text();
