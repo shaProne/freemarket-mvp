@@ -13,12 +13,14 @@ func NewDB() (*sql.DB, error) {
 	user := os.Getenv("DB_USER")
 	pass := os.Getenv("DB_PASS")
 	host := os.Getenv("DB_HOST") // 例: 127.0.0.1 (Cloud SQL Auth Proxy)
-	port := os.Getenv("DB_PORT") // 3306
 	name := os.Getenv("DB_NAME")
 
 	dsn := fmt.Sprintf(
-		"%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4",
-		user, pass, host, port, name,
+		"%s:%s@unix(%s)/%s?parseTime=true&charset=utf8mb4",
+		user,
+		pass,
+		host, // ← /cloudsql/INSTANCE_CONNECTION_NAME
+		name,
 	)
 
 	db, err := sql.Open("mysql", dsn)
