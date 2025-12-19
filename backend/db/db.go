@@ -7,22 +7,22 @@ import (
 )
 
 func NewDB() (*sql.DB, error) {
+	// Cloud Run 判定
+	if os.Getenv("K_SERVICE") != "" {
+		return newCloudSQL()
+	}
+	return newSQLite()
+}
+
+func newCloudSQL() (*sql.DB, error) {
 	user := os.Getenv("DB_USER")
 	pass := os.Getenv("DB_PASS")
-	host := os.Getenv("DB_HOST") // /cloudsql/xxx
+	socket := os.Getenv("DB_HOST") // /cloudsql/PROJECT:REGION:INSTANCE
 	name := os.Getenv("DB_NAME")
 
-	if user == "" || pass == "" || host == "" || name == "" {
-		return nil, fmt.Errorf("DB env missing")
-	}
-
-	// 👇 Cloud Run + Cloud SQL は unix socket
 	dsn := fmt.Sprintf(
-		"%s:%s@unix(%s)/%s?parseTime=true&charset=utf8mb4&loc=Asia%%2FTokyo",
-		user,
-		pass,
-		host,
-		name,
+		"%s:%s@unix(%s)/%s?parseTime=true&charset=utf8mb4",
+		user, pass, socket, name,
 	)
 
 	db, err := sql.Open("mysql", dsn)
@@ -30,10 +30,18 @@ func NewDB() (*sql.DB, error) {
 		return nil, err
 	}
 
-	// 👇 ここで死んでた可能性が高い
+	// Ping失敗しても panic させない
 	if err := db.Ping(); err != nil {
-		return nil, err
+		fmt.Println("⚠️ CloudSQL ping failed:", err)
 	}
 
+	return db, nil
+}
+
+func newSQLite() (*sql.DB, error) {
+	db, err := sql.Open("sqlite3", "./data.db")
+	if err != nil {
+		return nil, err
+	}
 	return db, nil
 }
