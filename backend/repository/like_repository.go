@@ -1,6 +1,8 @@
 package repository
 
-import "database/sql"
+import (
+	"database/sql"
+)
 
 type LikeRepository struct {
 	db *sql.DB
@@ -10,7 +12,25 @@ func NewLikeRepository(db *sql.DB) *LikeRepository {
 	return &LikeRepository{db: db}
 }
 
-func (r *LikeRepository) Add(userID, productID string) error {
+// main.go が呼んでる順番に合わせる
+func (r *LikeRepository) IsLiked(productID, userID string) (bool, error) {
+	var x int
+	err := r.db.QueryRow(`
+		SELECT 1 FROM likes
+		WHERE user_id = ? AND product_id = ?
+		LIMIT 1
+	`, userID, productID).Scan(&x)
+
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (r *LikeRepository) Like(productID, userID string) error {
 	_, err := r.db.Exec(`
 		INSERT INTO likes (user_id, product_id)
 		VALUES (?, ?)
@@ -19,7 +39,7 @@ func (r *LikeRepository) Add(userID, productID string) error {
 	return err
 }
 
-func (r *LikeRepository) Remove(userID, productID string) error {
+func (r *LikeRepository) Unlike(productID, userID string) error {
 	_, err := r.db.Exec(`
 		DELETE FROM likes
 		WHERE user_id = ? AND product_id = ?
@@ -27,7 +47,7 @@ func (r *LikeRepository) Remove(userID, productID string) error {
 	return err
 }
 
-func (r *LikeRepository) Count(productID string) (int, error) {
+func (r *LikeRepository) CountByProduct(productID string) (int, error) {
 	var count int
 	err := r.db.QueryRow(`
 		SELECT COUNT(*) FROM likes WHERE product_id = ?
