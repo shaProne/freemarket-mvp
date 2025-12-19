@@ -12,14 +12,13 @@ func NewLikeRepository(db *sql.DB) *LikeRepository {
 	return &LikeRepository{db: db}
 }
 
-// main.go が呼んでる順番に合わせる
 func (r *LikeRepository) IsLiked(productID, userID string) (bool, error) {
-	var x int
+	var dummy int
 	err := r.db.QueryRow(`
 		SELECT 1 FROM likes
 		WHERE user_id = ? AND product_id = ?
 		LIMIT 1
-	`, userID, productID).Scan(&x)
+	`, userID, productID).Scan(&dummy)
 
 	if err == sql.ErrNoRows {
 		return false, nil

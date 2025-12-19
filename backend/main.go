@@ -46,7 +46,7 @@ func withCORS(h http.HandlerFunc) http.HandlerFunc {
 			"https://freemarket-mvp.vercel.app": true,
 		}
 
-		if origin == "" || allowed[origin] {
+		if allowed[origin] {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 		}
 
