@@ -4,34 +4,36 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"strings"
 )
 
 func NewDB() (*sql.DB, error) {
 	user := os.Getenv("DB_USER")
 	pass := os.Getenv("DB_PASS")
+	host := os.Getenv("DB_HOST") // /cloudsql/xxx
 	name := os.Getenv("DB_NAME")
-	host := os.Getenv("DB_HOST") // /cloudsql/PROJECT:REGION:INSTANCE
 
-	var dsn string
-
-	if strings.HasPrefix(host, "/cloudsql/") {
-		// ✅ Cloud Run（UNIX socket）
-		dsn = fmt.Sprintf(
-			"%s:%s@unix(%s)/%s?parseTime=true&charset=utf8mb4",
-			user, pass, host, name,
-		)
-	} else {
-		// ✅ local（TCP）
-		port := os.Getenv("DB_PORT")
-		if port == "" {
-			port = "3306"
-		}
-		dsn = fmt.Sprintf(
-			"%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4",
-			user, pass, host, port, name,
-		)
+	if user == "" || pass == "" || host == "" || name == "" {
+		return nil, fmt.Errorf("DB env missing")
 	}
 
-	return sql.Open("mysql", dsn)
+	// 👇 Cloud Run + Cloud SQL は unix socket
+	dsn := fmt.Sprintf(
+		"%s:%s@unix(%s)/%s?parseTime=true&charset=utf8mb4&loc=Asia%%2FTokyo",
+		user,
+		pass,
+		host,
+		name,
+	)
+
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return nil, err
+	}
+
+	// 👇 ここで死んでた可能性が高い
+	if err := db.Ping(); err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }
