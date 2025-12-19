@@ -119,10 +119,11 @@ func main() {
 		}
 
 		var req struct {
-			UserID      string `json:"userId"`
-			Password    string `json:"password"`
-			DisplayName string `json:"displayName"`
-			MBTI        string `json:"mbti"`
+			UserID       string `json:"userId"`
+			Password     string `json:"password"`
+			DisplayName  string `json:"displayName"`
+			DisplayName2 string `json:"display_name"`
+			MBTI         string `json:"mbti"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

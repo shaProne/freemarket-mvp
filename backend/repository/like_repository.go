@@ -31,9 +31,9 @@ func (r *LikeRepository) IsLiked(productID, userID string) (bool, error) {
 
 func (r *LikeRepository) Like(productID, userID string) error {
 	_, err := r.db.Exec(`
-		INSERT INTO likes (user_id, product_id)
-		VALUES (?, ?)
-		ON DUPLICATE KEY UPDATE created_at = NOW()
+			INSERT INTO likes (user_id, product_id, created_at)
+			VALUES (?, ?, NOW())
+			ON DUPLICATE KEY UPDATE created_at = NOW()
 	`, userID, productID)
 	return err
 }
