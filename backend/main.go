@@ -24,15 +24,15 @@ func isAllowedOrigin(origin string) bool {
 	if origin == "" {
 		return false
 	}
-	// ローカル（Viteなら5173もよく使う）
 	if origin == "http://localhost:3000" || origin == "http://localhost:5173" {
 		return true
 	}
-	// Vercel: 本番 + preview まとめて許可
+	// 本番
 	if origin == "https://freemarket-mvp.vercel.app" {
 		return true
 	}
-	if strings.HasSuffix(origin, ".vercel.app") && strings.HasPrefix(origin, "https://") {
+	// preview も許可
+	if strings.HasPrefix(origin, "https://") && strings.HasSuffix(origin, ".vercel.app") {
 		return true
 	}
 	return false
@@ -42,23 +42,20 @@ func withCORS(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
 
-		allowed := map[string]bool{
-			"http://localhost:3000":             true,
-			"https://freemarket-mvp.vercel.app": true,
-		}
-
-		if allowed[origin] {
+		if isAllowedOrigin(origin) {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Vary", "Origin")
 		}
 
-		w.Header().Set("Vary", "Origin")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
+		// preflight はここで終わらせる（RequireAuthまで行かせない）
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
+
 		h(w, r)
 	}
 }
@@ -498,15 +495,7 @@ func main() {
 	// ===== MBTI Advice API =====
 	// POST /ai/mbti-advice
 	// Authorization: Bearer <token>
-	mux.HandleFunc("/ai/mbti-advice", withCORS(func(w http.ResponseWriter, r *http.Request) {
-
-		// ★ preflight は認証を通さない
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-
-		// ★ ここから認証必須
+	mux.HandleFunc("/ai/mbti-advice", withCORS(
 		middleware.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodPost {
 				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -518,20 +507,20 @@ func main() {
 				SellerMBTI string `json:"sellerMbti"`
 				BuyerMBTI  string `json:"buyerMbti"`
 			}
-
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 				http.Error(w, "invalid request", http.StatusBadRequest)
 				return
 			}
-
-			if req.SellerMBTI == "" || req.BuyerMBTI == "" {
-				http.Error(w, "mbti required", http.StatusBadRequest)
+			if req.SellerName == "" || req.SellerMBTI == "" || req.BuyerMBTI == "" {
+				http.Error(w, "sellerName, sellerMbti, buyerMbti are required", http.StatusBadRequest)
 				return
 			}
 
-			prompt := fmt.Sprintf(`
-あなたはフリマアプリのアシスタントです。
-出品者と購入希望者のMBTIをもとに、以下を日本語で簡潔に（3〜4文）説明してください。
+			prompt := fmt.Sprintf(
+				`あなたはフリマアプリのアシスタントです。
+
+出品者と購入希望者のMBTIをもとに、
+以下を日本語で簡潔に（3〜4文）説明してください。
 
 1. 出品者の性格傾向
 2. 両者の相性
@@ -542,7 +531,9 @@ func main() {
 MBTI: %s
 
 購入者MBTI: %s
-`, req.SellerName, req.SellerMBTI, req.BuyerMBTI)
+`,
+				req.SellerName, req.SellerMBTI, req.BuyerMBTI,
+			)
 
 			text, err := auth.GenerateText(prompt)
 			if err != nil {
@@ -555,8 +546,8 @@ MBTI: %s
 			json.NewEncoder(w).Encode(map[string]string{
 				"text": text,
 			})
-		})(w, r)
-	}))
+		}),
+	))
 
 	// ===== Product Chat Users API =====
 	// 商品ごとにDMしてきたユーザー一覧（相手一覧）
