@@ -41,19 +41,23 @@ func withCORS(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
 
-		if isAllowedOrigin(origin) {
-			w.Header().Set("Access-Control-Allow-Origin", origin) // 反射
-			w.Header().Set("Vary", "Origin")
+		allowed := map[string]bool{
+			"http://localhost:3000":             true,
+			"https://freemarket-mvp.vercel.app": true,
 		}
 
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		if origin == "" || allowed[origin] {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+		}
+
+		w.Header().Set("Vary", "Origin")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent) // 204
+			w.WriteHeader(http.StatusOK)
 			return
 		}
-
 		h(w, r)
 	}
 }
