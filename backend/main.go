@@ -92,8 +92,7 @@ func main() {
 
 	database, err := db.NewDB()
 	if err != nil {
-		log.Println("DB connection failed:", err)
-		// return せず続行（最低でも HTTP サーバは立てる）
+		log.Fatal("DB connection failed:", err) // ★ returnじゃなく死ぬ
 	}
 
 	store := repository.NewSQLiteProductRepository(database)

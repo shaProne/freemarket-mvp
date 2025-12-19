@@ -27,6 +27,7 @@ func (r *UserRepository) Create(u domain.User) error {
 }
 
 func (r *UserRepository) FindByID(id string) (domain.User, error) {
+
 	row := r.db.QueryRow(`
 		SELECT
 			id,
