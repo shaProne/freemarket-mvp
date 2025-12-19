@@ -44,6 +44,14 @@ export function ProductDetail({
     const [aiLoading, setAiLoading] = useState(false);
     const [aiError, setAiError] = useState<string | null>(null);
 
+    const [seller, setSeller] = useState<{
+        displayName: string;
+        mbti: string;
+    } | null>(null);
+
+    const [mbtiAdvice, setMbtiAdvice] = useState<string | null>(null);
+    const [loadingAdvice, setLoadingAdvice] = useState(false);
+
     const token = useMemo(() => localStorage.getItem("token") ?? "", []);
 
     // 1) 商品を取得
@@ -102,6 +110,37 @@ export function ProductDetail({
             .then((u) => setSellerDisplayName(u.displayName))
             .catch(() => setSellerDisplayName(product.sellerId));
     }, [product]);
+
+
+    useEffect(() => {
+        if (!product?.sellerId) return;
+
+        fetch(`${import.meta.env.VITE_API_BASE}/users/${product.sellerId}`)
+            .then(res => res.json())
+            .then(data => {
+                setSeller({
+                    displayName: data.displayName,
+                    mbti: data.mbti,
+                });
+            });
+    }, [product?.sellerId]);
+
+    useEffect(() => {
+        if (!seller?.mbti) return;
+
+        const myMbti = localStorage.getItem("mbti");
+        if (!myMbti) return;
+
+        setLoadingAdvice(true);
+        fetchMbtiAdvice(myMbti, seller.mbti)
+            .then(setMbtiAdvice)
+            .catch(() => setMbtiAdvice(null))
+            .finally(() => setLoadingAdvice(false));
+    }, [seller?.mbti]);
+
+
+
+
 
     const isOwnProduct = product?.sellerId === currentUserId;
     const isSold = product?.status === "sold";
@@ -335,6 +374,35 @@ export function ProductDetail({
                         </button>
                     </div>
                 )}
+
+                {/* 出品者紹介 */}
+                {seller && (
+                    <div className="mt-6 p-4 border rounded-lg bg-gray-50">
+                        <h3 className="font-semibold mb-2">出品者の紹介</h3>
+                        <p>👤 {seller.displayName}</p>
+                        <p>🧠 MBTI: {seller.mbti}</p>
+                    </div>
+                )}
+
+                {/* MBTI 相性アドバイス */}
+                {seller && (
+                    <div className="mt-4 p-4 border rounded-lg bg-white">
+                        <h3 className="font-semibold mb-2">コミュニケーションのヒント</h3>
+
+                        {loadingAdvice && (
+                            <p className="text-gray-500 text-sm">
+                                相性を分析中…
+                            </p>
+                        )}
+
+                        {!loadingAdvice && mbtiAdvice && (
+                            <p className="text-sm leading-relaxed">
+                                {mbtiAdvice}
+                            </p>
+                        )}
+                    </div>
+                )}
+            
             </div>
         </div>
     );

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"freemarket-backend/auth"
 	"freemarket-backend/db"
 	"freemarket-backend/domain"
@@ -492,6 +493,53 @@ func main() {
 			"mbti":        u.MBTI,
 		})
 	}))
+
+	// POST /ai/mbti-advice
+	mux.HandleFunc("/ai/mbti-advice", withCORS(
+		middleware.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+
+			var req struct {
+				SellerName string `json:"sellerName"`
+				SellerMBTI string `json:"sellerMbti"`
+				BuyerMBTI  string `json:"buyerMbti"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, "invalid request", http.StatusBadRequest)
+				return
+			}
+
+			prompt := fmt.Sprintf(`
+あなたはフリマアプリのアシスタントです。
+
+出品者と購入希望者のMBTIをもとに、
+以下を日本語で簡潔に（3〜4文）説明してください。
+
+1. 出品者の性格傾向
+2. 両者の相性
+3. 円滑にやり取りするコツ
+
+出品者:
+名前: %s
+MBTI: %s
+
+購入者MBTI: %s
+`, req.SellerName, req.SellerMBTI, req.BuyerMBTI)
+
+			text, err := auth.GenerateText(prompt) // 既存Gemini関数を流用
+			if err != nil {
+				http.Error(w, "AI error", http.StatusInternalServerError)
+				return
+			}
+
+			json.NewEncoder(w).Encode(map[string]string{
+				"text": text,
+			})
+		}),
+	))
 
 	// ===== Product Chat Users API =====
 	// 商品ごとにDMしてきたユーザー一覧（相手一覧）

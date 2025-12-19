@@ -221,6 +221,33 @@ export async function toggleLike(productId: string, token: string) {
     return JSON.parse(text) as { liked: boolean; likeCount: number };
 }
 
+
+export async function fetchMbtiAdvice(
+    myMbti: string,
+    sellerMbti: string
+): Promise<string> {
+    const res = await fetch(
+        `${import.meta.env.VITE_API_BASE}/ai/mbti-advice`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+            body: JSON.stringify({ myMbti, sellerMbti }),
+        }
+    );
+
+    if (!res.ok) {
+        throw new Error("failed to fetch mbti advice");
+    }
+
+    const data = await res.json();
+    return data.text;
+}
+
+
+
 export async function fetchProductsAuthed(token?: string) {
     const res = await fetch(`${API_BASE}/products`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
