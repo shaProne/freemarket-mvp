@@ -132,7 +132,8 @@ func main() {
 
 		hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 		if err != nil {
-			http.Error(w, "failed to hash password", http.StatusInternalServerError)
+			log.Println("signup insert error:", err) // ★これ必須
+			http.Error(w, "user already exists (or db error)", http.StatusBadRequest)
 			return
 		}
 
