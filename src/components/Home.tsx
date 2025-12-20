@@ -97,7 +97,7 @@ export function Home({ onNavigate }: HomeProps) {
         <div className="max-w-md mx-auto">
             {/* Header */}
             <div className="h-14 px-4 flex items-center justify-between border-b border-gray-200">
-                <div>マーケットプレイス</div>
+                <div>買い物が始まった、合図がした。</div>
                 <button
                     onClick={() => onNavigate({ type: "myPage" })}
                     className="p-2 hover:bg-gray-100 rounded-full"
