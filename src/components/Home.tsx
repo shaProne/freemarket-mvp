@@ -165,7 +165,18 @@ export function Home({ onNavigate }: HomeProps) {
                                     />
                                 </div>
 
-                                <div className="p-3 flex flex-col items-start gap-1 bg-white border-t border-gray-200">
+                                <button
+                                    key={product.id}
+                                    onClick={() => onNavigate({ type: "productDetail", productId: product.id })}
+                                    className="
+    relative flex flex-col
+    rounded-lg overflow-hidden
+    border border-gray-200 hover:border-gray-300
+    transition-colors
+    bg-white
+  "
+                                >
+
 
                                 {product.status === "considering" ? (
                                         <div className="text-red-600">出品検討中</div>
