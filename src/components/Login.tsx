@@ -31,7 +31,7 @@ export function Login({ onNavigate }: { onNavigate: (screen: Screen) => void }) 
 
     return (
         <div className="max-w-md mx-auto min-h-screen bg-white p-6">
-            <h1 className="text-xl mb-6">ログイン：u_999, pass1234を</h1>
+            <h1 className="text-xl mb-6">ログイン：u_999, pass1234をお使いください。</h1>
 
             <label className="block mb-2 text-gray-700">User ID</label>
             <input
