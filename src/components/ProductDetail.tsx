@@ -12,6 +12,7 @@ import {
 import { fetchMbtiAdvice } from "../lib/api";
 
 
+
 type ProductDetailProps = {
     productId: string;
     onNavigate: (screen: Screen) => void;
@@ -132,14 +133,15 @@ export function ProductDetail({
         if (!seller?.mbti) return;
 
         const myMbti = localStorage.getItem("mbti");
-        if (!myMbti) return;
+        const token = localStorage.getItem("token");
+        if (!myMbti || !token) return;
 
         setLoadingAdvice(true);
-        fetchMbtiAdvice(myMbti, seller.mbti)
+        fetchMbtiAdvice(seller.displayName, seller.mbti, myMbti, token)
             .then((res) => setMbtiAdvice(res.text))
             .catch(() => setMbtiAdvice(null))
             .finally(() => setLoadingAdvice(false));
-    }, [seller?.mbti]);
+    }, [seller?.mbti, seller?.displayName]);
 
 
 

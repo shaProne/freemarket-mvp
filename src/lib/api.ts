@@ -1,5 +1,5 @@
 // src/lib/api.ts
-const API_BASE = import.meta.env.VITE_API_BASE_URL;
+const API_BASE = import.meta.env.VITE_API_BASE;
 
 export type Product = {
     id: string;
@@ -222,35 +222,32 @@ export async function toggleLike(productId: string, token: string) {
 }
 
 
-export async function fetchMbtiAdvice(
-    buyerMbti: string,
-    sellerMbti: string,
-    sellerName: string
-) {
-    const token = localStorage.getItem("token");
 
-    const res = await fetch(
-        `${import.meta.env.VITE_API_BASE}/ai/mbti-advice`,
-        {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-                buyerMbti,
-                sellerMbti,
-                sellerName,
-            }),
-        }
-    );
+
+export async function fetchMbtiAdvice(
+    sellerName: string,
+    sellerMbti: string,
+    buyerMbti: string,
+    token: string
+): Promise<{ text: string }> {
+    const res = await fetch(`${API_BASE}/ai/mbti-advice`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+            sellerName,
+            sellerMbti,
+            buyerMbti,
+        }),
+    });
 
     if (!res.ok) {
-        throw new Error("failed to fetch mbti advice");
+        const t = await res.text().catch(() => "");
+        throw new Error(`mbti-advice failed: ${res.status} ${t}`);
     }
-
-    const data = await res.json();
-    return data.text as string;
+    return res.json();
 }
 
 
