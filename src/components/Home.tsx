@@ -165,8 +165,9 @@ export function Home({ onNavigate }: HomeProps) {
                                     />
                                 </div>
 
-                                <div className="p-3 flex flex-col items-start gap-1">
-                                    {product.status === "considering" ? (
+                                <div className="p-3 flex flex-col items-start gap-1 bg-white border-t border-gray-200">
+
+                                {product.status === "considering" ? (
                                         <div className="text-red-600">出品検討中</div>
                                     ) : (
                                         <div className="text-red-600">
